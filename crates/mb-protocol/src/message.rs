@@ -113,6 +113,21 @@ pub enum ControlMessage {
         /// Why.
         reason: DisconnectReason,
     },
+
+    /// This device's random contribution to a pairing verification code.
+    ///
+    /// Only the nonce travels. Both certificates are already known to both sides
+    /// from the TLS handshake, and TLS has already proved each peer holds the
+    /// private key for the one it presented — sending them again would add a
+    /// field that could disagree with the authenticated value.
+    PairNonce {
+        /// Fresh random bytes.
+        nonce: [u8; 32],
+    },
+    /// This device's user confirmed the codes match.
+    PairConfirm,
+    /// This device's user rejected the pairing, or abandoned it.
+    PairReject,
 }
 
 /// Messages on the input stream.
@@ -522,6 +537,8 @@ mod tests {
                 &[0x03, 0x01, 0x02],
             ),
             (ControlMessage::CursorLeave, &[0x05]),
+            (ControlMessage::PairConfirm, &[0x08]),
+            (ControlMessage::PairReject, &[0x09]),
             (
                 ControlMessage::Disconnect {
                     reason: DisconnectReason::Locked,

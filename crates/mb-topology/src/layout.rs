@@ -131,6 +131,49 @@ impl Layout {
         best
     }
 
+    /// Every screen the cursor can reach from `start` by crossing edges.
+    ///
+    /// A screen can be connected — its device online, its rectangle in the
+    /// layout — and still be *unreachable*, if the only path to it ran through a
+    /// machine that has since left. Milestone 8 surfaced this: in a chain
+    /// `A — B — C`, losing `B` leaves `C` connected but with no edge the cursor
+    /// can cross to get there. Without this the far machine simply stops
+    /// responding to the pointer, with nothing to explain why.
+    #[must_use]
+    pub fn reachable_from(&self, start: GlobalScreenId) -> Vec<GlobalScreenId> {
+        let mut reached = Vec::with_capacity(self.screens.len());
+        if self.get(start).is_none() {
+            return reached;
+        }
+        reached.push(start);
+
+        // Breadth-first over adjacency. The screen count is small enough that a
+        // linear scan per step is cheaper than building an index.
+        let mut cursor = 0;
+        while cursor < reached.len() {
+            let current = reached[cursor];
+            cursor += 1;
+
+            for screen in &self.screens {
+                if !reached.contains(&screen.id) && self.are_adjacent(current, screen.id) {
+                    reached.push(screen.id);
+                }
+            }
+        }
+        reached
+    }
+
+    /// Screens present in the layout that the cursor cannot reach from `start`.
+    #[must_use]
+    pub fn unreachable_from(&self, start: GlobalScreenId) -> Vec<GlobalScreenId> {
+        let reachable = self.reachable_from(start);
+        self.screens
+            .iter()
+            .map(|s| s.id)
+            .filter(|id| !reachable.contains(id))
+            .collect()
+    }
+
     /// The smallest rectangle covering every screen.
     #[must_use]
     pub fn bounding_box(&self) -> LogicalRect {
@@ -404,6 +447,61 @@ mod tests {
         );
         // Inside: no edge.
         assert_eq!(exited_edge(&rect, LogicalPoint::new(50.0, 50.0)), None);
+    }
+
+    #[test]
+    fn everything_in_a_connected_chain_is_reachable() {
+        let layout = Layout::new(vec![
+            screen(1, 0, 0.0, 0.0, 1920.0, 1080.0),
+            screen(2, 0, 1920.0, 0.0, 1920.0, 1080.0),
+            screen(3, 0, 3840.0, 0.0, 1920.0, 1080.0),
+        ])
+        .expect("valid");
+
+        let reachable = layout.reachable_from(id(1, 0));
+        assert_eq!(reachable.len(), 3);
+        assert!(layout.unreachable_from(id(1, 0)).is_empty());
+    }
+
+    #[test]
+    fn a_screen_beyond_a_gap_is_reported_as_unreachable() {
+        // The milestone 8 gap: in a chain A - B - C, losing B leaves C connected
+        // but with no edge the cursor can cross to get there. Silently, the far
+        // machine just stops responding to the pointer.
+        let layout = Layout::new(vec![
+            screen(1, 0, 0.0, 0.0, 1920.0, 1080.0),
+            screen(3, 0, 3840.0, 0.0, 1920.0, 1080.0),
+        ])
+        .expect("valid");
+
+        assert_eq!(layout.reachable_from(id(1, 0)), vec![id(1, 0)]);
+        assert_eq!(layout.unreachable_from(id(1, 0)), vec![id(3, 0)]);
+    }
+
+    #[test]
+    fn reachability_follows_vertical_edges_too() {
+        let layout = Layout::new(vec![
+            screen(1, 0, 0.0, 0.0, 1920.0, 1080.0),
+            screen(2, 0, 0.0, 1080.0, 1920.0, 1080.0),
+        ])
+        .expect("valid");
+        assert_eq!(layout.reachable_from(id(1, 0)).len(), 2);
+    }
+
+    #[test]
+    fn a_corner_touch_does_not_make_a_screen_reachable() {
+        // Two screens meeting at exactly one point cannot be crossed between.
+        let layout = Layout::new(vec![
+            screen(1, 0, 0.0, 0.0, 100.0, 100.0),
+            screen(2, 0, 100.0, 100.0, 100.0, 100.0),
+        ])
+        .expect("valid");
+        assert_eq!(layout.unreachable_from(id(1, 0)), vec![id(2, 0)]);
+    }
+
+    #[test]
+    fn reachability_from_an_unknown_screen_is_empty() {
+        assert!(side_by_side().reachable_from(id(9, 0)).is_empty());
     }
 
     #[test]

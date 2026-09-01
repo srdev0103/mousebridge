@@ -58,6 +58,7 @@ pub struct PeerConnection {
     device: DeviceId,
     name: DeviceName,
     version: Version,
+    certificate: rustls::pki_types::CertificateDer<'static>,
 }
 
 impl PeerConnection {
@@ -92,6 +93,17 @@ impl PeerConnection {
     #[must_use]
     pub const fn quic(&self) -> &quinn::Connection {
         &self.connection
+    }
+
+    /// The certificate the peer presented and proved it holds the key for.
+    ///
+    /// Needed for pairing: the verification code is derived from both
+    /// certificates, and taking this from the authenticated handshake rather
+    /// than from a message means a peer cannot show the user a code for a
+    /// certificate it does not actually hold.
+    #[must_use]
+    pub const fn certificate(&self) -> &rustls::pki_types::CertificateDer<'static> {
+        &self.certificate
     }
 
     /// Splits the connection into its parts, for the session layer.
@@ -130,7 +142,35 @@ impl Endpoint {
     ) -> Result<Self, NetError> {
         let server_crypto = tls::server_config(&identity, Arc::clone(&trust))?;
         let client_crypto = tls::client_config(&identity, trust)?;
+        Self::assemble(addr, identity, local_name, server_crypto, client_crypto)
+    }
 
+    /// Binds an endpoint that accepts any peer, for pairing only.
+    ///
+    /// The connections this produces must never carry input. Their sole purpose
+    /// is to let two devices that have never met exchange nonces so their users
+    /// can compare a verification code.
+    ///
+    /// # Errors
+    ///
+    /// As [`Endpoint::bind`].
+    pub fn bind_for_pairing(
+        addr: SocketAddr,
+        identity: Arc<Identity>,
+        local_name: DeviceName,
+    ) -> Result<Self, NetError> {
+        let server_crypto = tls::pairing_server_config(&identity)?;
+        let client_crypto = tls::pairing_client_config(&identity)?;
+        Self::assemble(addr, identity, local_name, server_crypto, client_crypto)
+    }
+
+    fn assemble(
+        addr: SocketAddr,
+        identity: Arc<Identity>,
+        local_name: DeviceName,
+        server_crypto: rustls::ServerConfig,
+        client_crypto: rustls::ClientConfig,
+    ) -> Result<Self, NetError> {
         let server_crypto = quinn::crypto::rustls::QuicServerConfig::try_from(server_crypto)
             .map_err(|e| NetError::TlsConfig {
                 side: "server",
@@ -361,7 +401,8 @@ impl Endpoint {
         // claims a different identity than it authenticated as is either
         // confused or probing — either way the claim is discarded and the
         // verified value is used.
-        let verified = self.verified_identity(&connection)?;
+        let certificate = self.peer_certificate(&connection)?;
+        let verified = mb_security::fingerprint(&certificate);
         if verified != claimed {
             warn!(
                 %verified,
@@ -377,11 +418,15 @@ impl Endpoint {
             device: verified,
             name,
             version,
+            certificate,
         })
     }
 
-    /// Extracts the identity that TLS actually authenticated.
-    fn verified_identity(&self, connection: &quinn::Connection) -> Result<DeviceId, NetError> {
+    /// Extracts the certificate TLS actually authenticated.
+    fn peer_certificate(
+        &self,
+        connection: &quinn::Connection,
+    ) -> Result<rustls::pki_types::CertificateDer<'static>, NetError> {
         let identity = connection.peer_identity().ok_or_else(|| {
             // Unreachable while client authentication is mandatory, but asserted
             // rather than assumed: if that ever changed, this is what stops an
@@ -405,7 +450,7 @@ impl Endpoint {
             })
         })?;
 
-        Ok(mb_security::fingerprint(end_entity))
+        Ok(end_entity.clone())
     }
 
     fn hello(&self) -> Hello {

@@ -32,10 +32,11 @@
 
 pub mod error;
 pub mod identity;
+pub mod pairing;
 pub mod pinning;
 pub mod trust;
 
 pub use error::SecurityError;
 pub use identity::{Identity, fingerprint};
-pub use pinning::{PinnedClientVerifier, PinnedServerVerifier};
+pub use pinning::{AcceptAnyForPairing, PinnedClientVerifier, PinnedServerVerifier};
 pub use trust::{TrustEntry, TrustStore};

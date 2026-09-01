@@ -107,6 +107,53 @@ pub struct DisplayStatus {
     pub is_primary: bool,
 }
 
+/// How a connected computer is doing, as the dashboard shows it.
+#[derive(Debug, Clone, Serialize, PartialEq, Eq)]
+pub struct PeerStatus {
+    /// Short device fingerprint, for display.
+    pub id_short: String,
+    /// Name the peer advertised.
+    pub name: String,
+    /// `connected`, `degraded`, or `unreachable`.
+    pub state: String,
+    /// Consecutive missed heartbeats, when degraded.
+    pub missed_heartbeats: u32,
+    /// True when this peer is currently receiving input.
+    pub active: bool,
+    /// True when the peer is connected but no path of screens reaches it.
+    ///
+    /// Shown distinctly from "disconnected": the machine is fine, the *route* is
+    /// gone, and the fix is to rearrange screens rather than to reconnect.
+    pub unreachable: bool,
+    /// Number of screens the peer contributes to the layout.
+    pub screen_count: usize,
+    /// Round-trip time in milliseconds, when measured.
+    pub latency_ms: Option<u32>,
+}
+
+/// Why sharing is not currently possible.
+///
+/// Distinct from a boolean so the UI can say what to *do*, not merely that
+/// something is wrong.
+#[derive(Debug, Clone, Serialize, PartialEq, Eq)]
+#[serde(tag = "kind", rename_all = "kebab-case")]
+pub enum SharingBlocker {
+    /// A privacy permission has not been granted.
+    MissingPermission {
+        /// Which one.
+        permission: String,
+    },
+    /// No other computer is paired.
+    NoPeers,
+    /// The user turned sharing off.
+    DisabledByUser,
+    /// The screen arrangement could not be built.
+    InvalidLayout {
+        /// What was wrong.
+        detail: String,
+    },
+}
+
 /// Everything the dashboard needs for one render.
 #[derive(Debug, Clone, Serialize, PartialEq)]
 pub struct CoreStatus {
@@ -127,16 +174,41 @@ pub struct CoreStatus {
     pub config_path: String,
     /// Anything the user should be told about how this session started.
     pub notice: Option<StartupNotice>,
+    /// Connected computers.
+    pub peers: Vec<PeerStatus>,
+    /// Why sharing cannot currently happen. Empty when it can.
+    ///
+    /// A list rather than a flag: the honest answer is often more than one thing,
+    /// and showing only the first sends the user round a loop of fixing one
+    /// problem to be told about the next.
+    pub blockers: Vec<SharingBlocker>,
+    /// Whether the user has sharing switched on.
+    pub sharing_enabled: bool,
 }
 
 impl CoreStatus {
     /// Builds a snapshot from live state.
+    ///
+    /// Peers are supplied rather than read from a global, so the dashboard's view
+    /// is assembled in one place and can be tested without a network.
     #[must_use]
     pub fn build(
         config: &Config,
         platform: &dyn Platform,
         config_path: &Path,
         notice: Option<StartupNotice>,
+    ) -> Self {
+        Self::build_with(config, platform, config_path, notice, Vec::new())
+    }
+
+    /// Builds a snapshot including connected peers.
+    #[must_use]
+    pub fn build_with(
+        config: &Config,
+        platform: &dyn Platform,
+        config_path: &Path,
+        notice: Option<StartupNotice>,
+        peers: Vec<PeerStatus>,
     ) -> Self {
         let host = platform.host().ok();
 
@@ -194,14 +266,32 @@ impl CoreStatus {
             Err(e) => (Vec::new(), Some(e.to_string())),
         };
 
+        // Every reason at once. Showing only the first sends the user round a
+        // loop of fixing one problem to be told about the next.
+        let mut blockers = Vec::new();
+        for permission in platform.missing_permissions() {
+            blockers.push(SharingBlocker::MissingPermission {
+                permission: permission_key(permission).to_owned(),
+            });
+        }
+        if !config.switching.enabled {
+            blockers.push(SharingBlocker::DisabledByUser);
+        }
+        if peers.is_empty() {
+            blockers.push(SharingBlocker::NoPeers);
+        }
+
         Self {
             device,
             permissions,
             displays,
             display_error,
-            sharing_ready: platform.missing_permissions().is_empty(),
+            sharing_ready: blockers.is_empty(),
             config_path: config_path.display().to_string(),
             notice,
+            peers,
+            blockers,
+            sharing_enabled: config.switching.enabled,
         }
     }
 }
@@ -255,33 +345,118 @@ mod tests {
         assert_eq!(status.device.name, "Studio Mac");
     }
 
+    fn peer(name: &str, active: bool) -> PeerStatus {
+        PeerStatus {
+            id_short: "abcd1234".to_owned(),
+            name: name.to_owned(),
+            state: "connected".to_owned(),
+            missed_heartbeats: 0,
+            active,
+            unreachable: false,
+            screen_count: 1,
+            latency_ms: Some(2),
+        }
+    }
+
     #[test]
-    fn sharing_is_ready_only_when_every_gate_is_open() {
-        let ok = CoreStatus::build(
+    fn every_blocker_is_reported_at_once() {
+        // Showing only the first sends the user round a loop: grant a permission,
+        // be told about the next one, and so on.
+        let platform = MockPlatform::single_display()
+            .with_permission(Permission::Accessibility, PermissionStatus::Denied)
+            .with_permission(Permission::InputMonitoring, PermissionStatus::Denied);
+        let mut cfg = config();
+        cfg.switching.enabled = false;
+
+        let status = CoreStatus::build(&cfg, &platform, &PathBuf::from("/c"), None);
+
+        assert!(status.blockers.len() >= 3, "{:?}", status.blockers);
+        assert!(
+            status
+                .blockers
+                .iter()
+                .any(|b| matches!(b, SharingBlocker::DisabledByUser))
+        );
+        assert!(
+            status
+                .blockers
+                .iter()
+                .any(|b| matches!(b, SharingBlocker::NoPeers))
+        );
+        assert_eq!(
+            status
+                .blockers
+                .iter()
+                .filter(|b| matches!(b, SharingBlocker::MissingPermission { .. }))
+                .count(),
+            2
+        );
+    }
+
+    #[test]
+    fn having_no_peers_is_itself_a_blocker() {
+        // Everything is granted and switched on, and there is still nothing to
+        // share with. Reporting "ready" here would be a lie the user cannot act on.
+        let status = CoreStatus::build(
             &config(),
             &MockPlatform::single_display(),
             &PathBuf::from("/c"),
             None,
         );
+        assert!(!status.sharing_ready);
+        assert!(
+            status
+                .blockers
+                .iter()
+                .any(|b| matches!(b, SharingBlocker::NoPeers))
+        );
+    }
+
+    #[test]
+    fn a_paired_and_permitted_setup_reports_ready() {
+        let status = CoreStatus::build_with(
+            &config(),
+            &MockPlatform::single_display(),
+            &PathBuf::from("/c"),
+            None,
+            vec![peer("Windows PC", true)],
+        );
+        assert!(status.sharing_ready, "blocked by {:?}", status.blockers);
+        assert!(status.blockers.is_empty());
+        assert_eq!(status.peers.len(), 1);
+        assert!(status.peers[0].active);
+    }
+
+    #[test]
+    fn sharing_is_ready_only_when_every_gate_is_open() {
+        let ok = CoreStatus::build_with(
+            &config(),
+            &MockPlatform::single_display(),
+            &PathBuf::from("/c"),
+            None,
+            vec![peer("PC", false)],
+        );
         assert!(ok.sharing_ready);
 
-        let blocked = CoreStatus::build(
+        let blocked = CoreStatus::build_with(
             &config(),
             &MockPlatform::single_display()
                 .with_permission(Permission::Accessibility, PermissionStatus::Unknown),
             &PathBuf::from("/c"),
             None,
+            vec![peer("PC", false)],
         );
         assert!(!blocked.sharing_ready, "Unknown must not count as ready");
     }
 
     #[test]
     fn a_platform_without_gates_reports_no_permissions_and_is_ready() {
-        let status = CoreStatus::build(
+        let status = CoreStatus::build_with(
             &config(),
             &MockPlatform::single_display().with_no_required_permissions(),
             &PathBuf::from("/c"),
             None,
+            vec![peer("PC", false)],
         );
         assert!(status.permissions.is_empty());
         assert!(status.sharing_ready);

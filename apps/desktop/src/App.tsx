@@ -1,10 +1,13 @@
 import { useState } from "react";
-import { revealConfig, setDeviceName } from "./ipc/commands";
+import { closeDashboard, revealConfig, setDeviceName, setSharingEnabled } from "./ipc/commands";
 import { useStatus } from "./ipc/useStatus";
 import type { StartupNotice } from "./ipc/types";
 import { Button, Card, Row } from "./components/Card";
+import { Blockers } from "./components/Blockers";
 import { DisplayMap } from "./components/DisplayMap";
+import { PeerList } from "./components/PeerList";
 import { PermissionList } from "./components/PermissionList";
+import { Settings } from "./components/Settings";
 
 export default function App() {
   const { status, error, refresh } = useStatus();
@@ -43,22 +46,50 @@ export default function App() {
       {status.notice && <NoticeBanner notice={status.notice} />}
 
       <div
-        className={`flex items-center gap-2 rounded-lg border px-4 py-3 text-sm ${
+        className={`rounded-lg border px-4 py-3 ${
           status.sharing_ready
-            ? "border-emerald-500/40 bg-emerald-500/10 text-emerald-700 dark:text-emerald-300"
-            : "border-amber-500/40 bg-amber-500/10 text-amber-700 dark:text-amber-300"
+            ? "border-emerald-500/40 bg-emerald-500/10"
+            : "border-amber-500/40 bg-amber-500/10"
         }`}
       >
-        <span
-          aria-hidden
-          className={`size-2 rounded-full ${
-            status.sharing_ready ? "bg-emerald-500" : "bg-amber-500"
-          }`}
-        />
-        {status.sharing_ready
-          ? "Ready to share input. Networking arrives in a later milestone."
-          : "Setup incomplete — grant the permissions below before sharing can start."}
+        <div className="flex items-center gap-2">
+          <span
+            aria-hidden
+            className={`size-2 rounded-full ${
+              status.sharing_ready ? "bg-emerald-500" : "bg-amber-500"
+            }`}
+          />
+          <span
+            className={`text-sm font-medium ${
+              status.sharing_ready
+                ? "text-emerald-700 dark:text-emerald-300"
+                : "text-amber-700 dark:text-amber-300"
+            }`}
+          >
+            {status.sharing_ready
+              ? "Sharing input"
+              : `Not sharing — ${status.blockers.length} thing${
+                  status.blockers.length === 1 ? "" : "s"
+                } to sort out`}
+          </span>
+          <button
+            type="button"
+            onClick={() => void setSharingEnabled(!status.sharing_enabled).then(refresh)}
+            className="ml-auto cursor-pointer rounded-md border border-[var(--color-line)] bg-[var(--color-surface)] px-2.5 py-1 text-xs font-medium"
+          >
+            {status.sharing_enabled ? "Turn off" : "Turn on"}
+          </button>
+        </div>
+        {!status.sharing_ready && (
+          <div className="mt-3">
+            <Blockers blockers={status.blockers} />
+          </div>
+        )}
       </div>
+
+      <Card title={`Your Computers (${status.peers.length})`}>
+        <PeerList peers={status.peers} />
+      </Card>
 
       <Card title="This Computer">
         <div className="mb-3">
@@ -100,6 +131,10 @@ export default function App() {
         )}
       </Card>
 
+      <Card title="Switching">
+        <Settings status={status} onChanged={() => void refresh()} />
+      </Card>
+
       <Card
         title="Configuration"
         action={<Button onClick={() => void revealConfig()}>Reveal in Finder</Button>}
@@ -108,6 +143,11 @@ export default function App() {
           {status.config_path}
         </p>
       </Card>
+
+      <footer className="flex items-center justify-between border-t border-[var(--color-line)] pt-4 text-xs text-[var(--color-ink-muted)]">
+        <span>MouseBridge keeps running in the menu bar when this window is closed.</span>
+        <Button onClick={() => void closeDashboard()}>Close</Button>
+      </footer>
     </Shell>
   );
 }
@@ -117,7 +157,7 @@ function Shell({ children }: { children: React.ReactNode }) {
     <main className="mx-auto flex max-w-2xl flex-col gap-4 p-6">
       <header className="mb-1 flex items-baseline justify-between">
         <h1 className="text-xl font-semibold tracking-tight">MouseBridge</h1>
-        <span className="text-xs text-[var(--color-ink-muted)]">Milestone 1 · foundation</span>
+        <span className="text-xs text-[var(--color-ink-muted)]">Milestone 13 · production UX</span>
       </header>
       {children}
     </main>

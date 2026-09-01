@@ -207,6 +207,122 @@ impl ClientCertVerifier for PinnedClientVerifier {
     }
 }
 
+/// Accepts any certificate, for the pairing handshake only.
+///
+/// # Why this exists, and why it is not as alarming as it looks
+///
+/// Two devices that have never met cannot pin each other — there is nothing to
+/// pin against. Some connection has to happen first. This verifier permits that
+/// connection and **nothing else**: the transport built with it carries only
+/// nonce exchange and confirmation, never input, clipboard or files.
+///
+/// Signature verification is *not* skipped. The peer still has to prove it holds
+/// the private key for the certificate it presents, which is what makes that
+/// certificate a meaningful thing to show the user a code for. What is skipped
+/// is the question of whether the key is one we recognise, which by definition
+/// it is not.
+///
+/// The security of the pairing rests entirely on the user comparing the code on
+/// both screens. See [`crate::pairing`].
+#[derive(Debug)]
+pub struct AcceptAnyForPairing {
+    algorithms: WebPkiSupportedAlgorithms,
+    hints: Vec<DistinguishedName>,
+}
+
+impl AcceptAnyForPairing {
+    /// Builds a pairing-mode verifier.
+    #[must_use]
+    pub fn new(provider: &CryptoProvider) -> Self {
+        Self {
+            algorithms: provider.signature_verification_algorithms,
+            hints: Vec::new(),
+        }
+    }
+}
+
+impl ServerCertVerifier for AcceptAnyForPairing {
+    fn verify_server_cert(
+        &self,
+        _end_entity: &CertificateDer<'_>,
+        _intermediates: &[CertificateDer<'_>],
+        _server_name: &ServerName<'_>,
+        _ocsp_response: &[u8],
+        _now: UnixTime,
+    ) -> Result<ServerCertVerified, TlsError> {
+        Ok(ServerCertVerified::assertion())
+    }
+
+    fn verify_tls12_signature(
+        &self,
+        message: &[u8],
+        cert: &CertificateDer<'_>,
+        dss: &DigitallySignedStruct,
+    ) -> Result<HandshakeSignatureValid, TlsError> {
+        verify_signature(&self.algorithms, message, cert, dss, false)
+    }
+
+    fn verify_tls13_signature(
+        &self,
+        message: &[u8],
+        cert: &CertificateDer<'_>,
+        dss: &DigitallySignedStruct,
+    ) -> Result<HandshakeSignatureValid, TlsError> {
+        verify_signature(&self.algorithms, message, cert, dss, true)
+    }
+
+    fn supported_verify_schemes(&self) -> Vec<SignatureScheme> {
+        self.algorithms.supported_schemes()
+    }
+}
+
+impl ClientCertVerifier for AcceptAnyForPairing {
+    fn offer_client_auth(&self) -> bool {
+        true
+    }
+
+    fn client_auth_mandatory(&self) -> bool {
+        // Still mandatory. A peer that presents no certificate cannot be shown a
+        // verification code for anything, so there would be nothing to pair with.
+        true
+    }
+
+    fn root_hint_subjects(&self) -> &[DistinguishedName] {
+        &self.hints
+    }
+
+    fn verify_client_cert(
+        &self,
+        _end_entity: &CertificateDer<'_>,
+        _intermediates: &[CertificateDer<'_>],
+        _now: UnixTime,
+    ) -> Result<ClientCertVerified, TlsError> {
+        Ok(ClientCertVerified::assertion())
+    }
+
+    fn verify_tls12_signature(
+        &self,
+        message: &[u8],
+        cert: &CertificateDer<'_>,
+        dss: &DigitallySignedStruct,
+    ) -> Result<HandshakeSignatureValid, TlsError> {
+        verify_signature(&self.algorithms, message, cert, dss, false)
+    }
+
+    fn verify_tls13_signature(
+        &self,
+        message: &[u8],
+        cert: &CertificateDer<'_>,
+        dss: &DigitallySignedStruct,
+    ) -> Result<HandshakeSignatureValid, TlsError> {
+        verify_signature(&self.algorithms, message, cert, dss, true)
+    }
+
+    fn supported_verify_schemes(&self) -> Vec<SignatureScheme> {
+        self.algorithms.supported_schemes()
+    }
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -366,6 +482,45 @@ mod tests {
             .expect_err("rejected");
 
         assert_eq!(unknown.to_string(), reject().to_string());
+    }
+
+    #[test]
+    fn the_pairing_verifier_accepts_a_stranger() {
+        // It must, or two devices that have never met could never pair. What
+        // makes this safe is that the connection it permits carries only nonce
+        // exchange, and that the user compares a code on both screens.
+        let stranger = Identity::generate().expect("generates");
+        let verifier = AcceptAnyForPairing::new(&provider());
+        let now = UnixTime::since_unix_epoch(std::time::Duration::from_secs(1));
+
+        assert!(
+            verifier
+                .verify_client_cert(stranger.certificate(), &[], now)
+                .is_ok()
+        );
+    }
+
+    #[test]
+    fn the_pairing_verifier_still_requires_client_authentication() {
+        // A peer presenting no certificate cannot be shown a code for anything.
+        let verifier = AcceptAnyForPairing::new(&provider());
+        assert!(ClientCertVerifier::offer_client_auth(&verifier));
+        assert!(ClientCertVerifier::client_auth_mandatory(&verifier));
+    }
+
+    #[test]
+    fn the_pairing_verifier_still_verifies_signatures() {
+        // Skipping this would let anyone present a copy of someone else's
+        // certificate without holding the key, and the code shown to the user
+        // would then be meaningless.
+        let verifier = AcceptAnyForPairing::new(&provider());
+        assert!(!ServerCertVerifier::supported_verify_schemes(&verifier).is_empty());
+    }
+
+    #[test]
+    fn the_pairing_verifier_discloses_nothing_about_paired_devices() {
+        let verifier = AcceptAnyForPairing::new(&provider());
+        assert!(ClientCertVerifier::root_hint_subjects(&verifier).is_empty());
     }
 
     #[test]

@@ -13,6 +13,7 @@
 use mb_topology::cursor::{CursorTracker, Movement, SwitchingRules};
 use mb_topology::layout::{Layout, PlacedScreen};
 use mb_types::{DeviceId, GlobalScreenId, LogicalRect, Scale, ScreenId};
+
 use proptest::prelude::*;
 use std::time::{Duration, Instant};
 
@@ -226,5 +227,93 @@ proptest! {
             tracker.position(),
             screen.id
         );
+    }
+}
+
+proptest! {
+    /// Screens that touch in a device's own arrangement still touch after being
+    /// converted to shared units.
+    ///
+    /// This is ADR 0001's central claim, stated as a property. Converting each
+    /// screen's origin independently breaks it for any pair with different scale
+    /// factors — which is every mixed-DPI laptop-plus-monitor setup.
+    #[test]
+    fn converted_screens_keep_their_adjacency(
+        left_scale in prop_oneof![Just(1.0f64), Just(1.25), Just(1.5), Just(2.0), Just(3.0)],
+        right_scale in prop_oneof![Just(1.0f64), Just(1.25), Just(1.5), Just(2.0), Just(3.0)],
+        left_width in 800.0f64..4000.0,
+        right_width in 800.0f64..4000.0,
+    ) {
+        use mb_topology::mapping::{DeviceScreens, ScreenMapping};
+        use mb_types::{LogicalPoint, OsKind, Scale};
+
+        let left_native = LogicalRect::from_parts(0.0, 0.0, left_width, 1080.0).unwrap();
+        let right_native =
+            LogicalRect::from_parts(left_width, 0.0, right_width, 1080.0).unwrap();
+
+        let device = DeviceScreens::new(vec![
+            ScreenMapping::from_native(
+                id(1),
+                left_native,
+                Scale::new(left_scale).unwrap(),
+                OsKind::Windows,
+            ),
+            ScreenMapping::from_native(
+                GlobalScreenId::new(DeviceId::from_bytes([1; 32]), ScreenId(1)),
+                right_native,
+                Scale::new(right_scale).unwrap(),
+                OsKind::Windows,
+            ),
+        ]);
+
+        let placed = device.place_at(LogicalPoint::ZERO);
+        prop_assert_eq!(placed.len(), 2);
+
+        let a = &placed[0];
+        let b = &placed[1];
+        let gap = (b.bounds.min_x() - a.bounds.max_x()).abs();
+        prop_assert!(
+            gap < 1e-6,
+            "scales {}/{} opened a {} point gap",
+            left_scale,
+            right_scale,
+            gap
+        );
+        prop_assert!(!a.bounds.intersects(&b.bounds), "screens overlap");
+    }
+
+    /// A converted arrangement is always a valid layout.
+    ///
+    /// If it were not, the whole topology would refuse to build and the cursor
+    /// would have nowhere to go.
+    #[test]
+    fn a_converted_arrangement_is_always_a_valid_layout(
+        scales in prop::collection::vec(
+            prop_oneof![Just(1.0f64), Just(1.5), Just(2.0)],
+            1..5,
+        ),
+    ) {
+        use mb_topology::mapping::{DeviceScreens, ScreenMapping};
+        use mb_types::{LogicalPoint, OsKind, Scale};
+
+        // A row of monitors, each starting where the last ended.
+        let mut screens = Vec::new();
+        let mut x = 0.0;
+        for (index, scale) in scales.iter().enumerate() {
+            let width = 1920.0 * scale;
+            screens.push(ScreenMapping::from_native(
+                GlobalScreenId::new(
+                    DeviceId::from_bytes([1; 32]),
+                    ScreenId(u32::try_from(index).unwrap()),
+                ),
+                LogicalRect::from_parts(x, 0.0, width, 1080.0).unwrap(),
+                Scale::new(*scale).unwrap(),
+                OsKind::Windows,
+            ));
+            x += width;
+        }
+
+        let placed = DeviceScreens::new(screens).place_at(LogicalPoint::ZERO);
+        prop_assert!(Layout::new(placed).is_ok(), "conversion produced an invalid layout");
     }
 }

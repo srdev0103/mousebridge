@@ -58,15 +58,30 @@ Recorded so the milestone-13 budget has real numbers to argue with, not guesses.
 | RSS, window open | 73 MB | macOS 15.7.9, Intel |
 | RSS, window "closed" | **75 MB** | **hiding reclaims nothing — see below** |
 
-**Finding: hide-on-close does not reduce memory.** The shell currently hides the
+**Finding: hide-on-close does not reduce memory.** The shell originally hid the
 window on close so the app keeps running in the menu bar. On macOS the WKWebView
 lives in separate system-managed processes that are not children of ours, and
-hiding a window destroys none of it. The tray-only idle state therefore costs the
-same ~75 MB as the visible one, against a target of roughly 30 MB.
+hiding a window destroys none of it. The tray-only idle state therefore cost the
+same as the visible one.
 
-The fix is to **destroy** the window on close and rebuild it on demand rather
-than hiding it. That is a milestone-13 change (it needs the real tray UX around
-it), and it is recorded here so the budget is not quietly assumed to be met.
+**Correction (milestone 13): the original figure undercounted.** The 75 MB above
+was the application process alone. The webview runs in separate processes that a
+`ps` on the parent does not see. Measured again with those included:
+
+| | App process | Webview processes | Total |
+|---|---|---|---|
+| Window open | 72 MB | 26 MB | **~98 MB** |
+
+**The fix is implemented but unverified.** Milestone 13 changed close-to-destroy
+rather than hide (see `apps/desktop/src-tauri/src/window.rs`). Whether it
+actually reclaims the webview processes **has not been demonstrated**: closing
+the window needs a click or a keystroke, and `osascript` on this machine is
+refused assistive access, so the automated attempt silently did nothing and the
+window stayed open. The unchanged reading that followed is evidence about the
+test, not about the fix.
+
+To verify: launch the app, open Activity Monitor, close the dashboard window by
+hand, and check whether the `MouseBridge Web Content` processes exit.
 
 Idle CPU was not measured meaningfully: `ps %cpu` on macOS is an average over
 process lifetime, so a short-lived sample is dominated by startup. Steady-state
@@ -249,6 +264,117 @@ Needing real hardware:
 | Three physical machines in a chain | ⬜ | |
 | Crossing a chain end to end without stopping | ⬜ | Mac → Windows → Mac Mini in one motion |
 | Behaviour when the middle machine of a chain leaves | ⬜ | The far machine becomes unreachable by cursor |
+
+## Milestone 9 — multiple monitors and DPI
+
+| Check | Status | Notes |
+|---|---|---|
+| macOS bounds are treated as already-shared units | ✅ | `CGDisplayBounds` accounts for user scaling |
+| Windows bounds are divided by effective scale | ✅ | 3840 at 150% becomes 2560 |
+| A Retina Mac and a scaled PC end up comparable | ✅ | Same perceived size, same shared size |
+| The native space is preserved exactly | ✅ | Injection depends on it; no rounding |
+| **Mixed-DPI screens on one device stay adjacent** | ✅ | Property test across every scale pairing |
+| A converted arrangement is always a valid layout | ✅ | Property test |
+| Multi-monitor devices keep their own arrangement | ✅ | The block is translated, never reflowed |
+| A negative native origin normalises correctly | ✅ | Monitor left of the Windows primary |
+| **A peer stranded by a departed neighbour is reported** | ✅ | Closes the milestone 8 gap |
+| Corner-touching screens are not reachable | ✅ | One shared point is not a crossable edge |
+
+Needing real hardware:
+
+| Check | Status | Notes |
+|---|---|---|
+| A real mixed-DPI Windows arrangement | ⬜ | The assumption behind ADR 0001 is still unconfirmed on hardware |
+| Cursor speed feels consistent across a DPI boundary | ⬜ | The conversion is arithmetically right; the feel is untested |
+| Display hotplug mid-session rebuilds the layout | ⬜ | |
+| macOS "looks like" scaling changes mid-session | ⬜ | |
+
+## Milestone 10 — pairing
+
+| Check | Status | Notes |
+|---|---|---|
+| Two strangers derive the same code | ✅ | Over a real pairing-mode connection |
+| **An interposed attacker cannot make both screens agree** | ✅ | Attacker pairs with each side; codes differ |
+| Both sides must confirm before anything is trusted | ✅ | One-sided confirmation yields no certificate |
+| A rejected pairing yields nothing to trust | ✅ | Terminal; a later confirmation cannot revive it |
+| A freshly paired device connects normally afterwards | ✅ | Pinned connection succeeds where it was refused before |
+| A peer offering our own certificate is refused | ✅ | Loopback or replay; the code would trivially match |
+| The code is order-independent | ✅ | Both sides compute the same value whoever initiated |
+| A fresh nonce changes the code | ✅ | An observer of a past code learns nothing |
+| Renaming a device does not change the code | ✅ | Names are cosmetic and user-editable |
+| Codes are spread across the range | ✅ | 190+ distinct in 200 derivations |
+| The pairing verifier still checks signatures | ✅ | Accepting any *identity* is not accepting any *claim* |
+
+Needing a person:
+
+| Check | Status | Notes |
+|---|---|---|
+| The code is genuinely comparable at a glance | ⬜ | Six digits grouped in threes; only use confirms it |
+| The prompt makes a mismatch obvious | ⬜ | Milestone 13 |
+
+## Milestone 11 — clipboard
+
+The synchronisation rules and chunked transfer are complete and tested. The
+platform watchers that detect a clipboard change are **not written**; see below.
+
+| Check | Status | Notes |
+|---|---|---|
+| **A copy crosses once and stops** | ✅ | The loop, broken. Property-tested over arbitrary interleavings |
+| Repeated notifications for one write are all suppressed | ✅ | Windows emits several; macOS coalesces |
+| A genuine new copy is never swallowed | ✅ | The failure mode of a stuck suppression flag |
+| Copying in both directions settles | ✅ | |
+| A three-way exchange settles | ✅ | More paths for the loop to travel |
+| Applications and suppressions stay balanced | ✅ | Property test; a growing gap means a slow loop |
+| Text and an image with identical bytes do not collide | ✅ | |
+| Clipboard contents never appear in `Debug` or `Display` | ✅ | Including inside a containing struct |
+| Oversized content is refused, not truncated | ✅ | A silently shortened clipboard is worse than none |
+| Remote content is re-validated on receipt | ✅ | The sender's claim is not evidence |
+| A truncated transfer never becomes valid content | ✅ | Hash-checked; a partial file must not become a file |
+| A lying offer cannot be exceeded | ✅ | Running total checked against the declared size |
+| Out-of-order chunks are refused, not buffered | ✅ | Buffering would do an attacker's allocation |
+
+Not yet written:
+
+| Item | Status | Notes |
+|---|---|---|
+| macOS clipboard watcher | ⬜ | `NSPasteboard.changeCount` polling |
+| Windows clipboard watcher | ⬜ | `AddClipboardFormatListener` |
+| Reading and writing the actual clipboard | ⬜ | `arboard` for transfer, custom watcher for detection |
+| Image formats beyond PNG | ⬜ | Deliberately deferred |
+
+## Milestone 12 — file transfer
+
+The state machine and destination-path safety are complete and tested. Streaming
+bytes to disk is not written; see below.
+
+| Check | Status | Notes |
+|---|---|---|
+| **Traversal cannot escape the download folder** | ✅ | Property-tested over arbitrary strings |
+| A sanitised name is always one path component | ✅ | Property test |
+| A destination lands directly inside the chosen folder | ✅ | Property test |
+| Both separators are treated as separators everywhere | ✅ | A hostile peer sends whichever the receiver ignores |
+| A null byte cannot survive | ✅ | It would truncate a path in any C API downstream |
+| Windows-forbidden characters are replaced on both platforms | ✅ | Or transfers work one way and fail the other |
+| Reserved device names are defused | ✅ | `CON.txt` is still `CON` |
+| `CONTRACT.pdf` is left alone | ✅ | Only exact device names are mangled |
+| Trailing dots and spaces are stripped | ✅ | Windows strips them silently, changing the file |
+| Over-long names truncate on a character boundary | ✅ | |
+| Sanitising is idempotent | ✅ | A second pass must not rename the file |
+| **An existing file is never overwritten** | ✅ | Property-tested; suffixed instead |
+| A transfer starts awaiting consent | ✅ | Paired is not permission to write files |
+| An oversized offer is refused before prompting | ✅ | |
+| Corrupted content fails rather than completing | ✅ | Hash-checked |
+| A truncated transfer never completes | ✅ | |
+| A cancellation crossing a completion cannot undo it | ✅ | Routine on a real network |
+
+Not yet written:
+
+| Item | Status | Notes |
+|---|---|---|
+| Streaming chunks to disk | ⬜ | Currently assembled in memory, bounded at 2 GiB |
+| Removing the partial file on failure | ⬜ | Caller's job; the event says so |
+| Multi-file transfers | ⬜ | One offer per file today |
+| Drag-and-drop UI | ⬜ | Milestone 13 |
 
 ## Known environment limitations
 

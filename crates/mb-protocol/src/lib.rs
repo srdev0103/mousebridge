@@ -34,12 +34,14 @@
 #![forbid(unsafe_code)]
 #![cfg_attr(test, allow(clippy::unwrap_used, clippy::expect_used))]
 
+pub mod chunking;
 pub mod error;
 pub mod frame;
 pub mod message;
 pub mod motion;
 pub mod version;
 
+pub use chunking::{CHUNK_SIZE, Chunk, ChunkedOffer, Reassembler, split};
 pub use error::ProtocolError;
 pub use frame::{MAX_FRAME_LEN, decode_frame, encode_frame};
 pub use message::{ControlMessage, Hello, InputMessage, SessionMessage};

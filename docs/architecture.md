@@ -180,9 +180,38 @@ Dependencies point one way. `mb-types` depends on nothing; `mb-config` and
   is usually still there. Yanking the cursor back mid-sentence is worse for the
   user than a moment of uncertainty.
 
+- **A mixed-DPI arrangement is rebuilt, not transformed.** Scaling each screen's
+  origin by its own factor cannot preserve adjacency: a 150% panel at native
+  `0..2880` beside a 100% monitor at `2880..4800` converts to `0..1920` and
+  `2880..4800`, opening a 960-point gap between screens that physically touch —
+  because the second origin was scaled by its own ratio when the distance it
+  describes was spanned by the *first* screen's pixels. The arrangement is
+  reconstructed by walking native adjacency and placing each neighbour flush,
+  which makes adjacency survive by construction. This is ADR 0001's central claim,
+  and it is now a property test.
+
+- **Reachability is not the same as connectivity.** In a chain `A — B — C`,
+  losing `B` leaves `C` online with no edge the cursor can cross to reach it.
+  `Layout::unreachable_from` surfaces that, so the far machine can be shown as
+  stranded rather than silently ignoring the pointer.
+
+- **The clipboard loop is broken by content identity, not a flag or a timer.**
+  A suppression flag fails because the platforms do not guarantee one change
+  notification per write — Windows can send several, macOS coalesces — so a flag
+  consumed by the first leaves the rest to loop, and one left set swallows the
+  user's next real copy. A time window fails because no value is right: too short
+  and the loop resumes, too long and a fast second copy is lost. Remembering
+  *what* was written has neither problem.
+
+- **Reassembly checks every bound against a local limit, never the sender's
+  claim.** The declared size is refused before a byte is allocated; the running
+  total is checked so a lying offer cannot be exceeded; and the assembled bytes
+  are hashed, so a truncated transfer never silently becomes the user's clipboard
+  or a file on their disk.
+
 ## Testing
 
-`cargo test --workspace` — 430 tests, no hardware required beyond the host.
+`cargo test --workspace` — 517 tests, no hardware required beyond the host.
 
 Nine of those are property tests over the input state machine, asserting that
 after *any* sequence of events — including sequences no real keyboard produces —

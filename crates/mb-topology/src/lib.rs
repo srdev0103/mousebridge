@@ -20,6 +20,8 @@
 
 pub mod cursor;
 pub mod layout;
+pub mod mapping;
 
 pub use cursor::{CursorTracker, Movement, SwitchingRules};
 pub use layout::{Layout, LayoutError, PlacedScreen};
+pub use mapping::{DeviceScreens, ScreenMapping};

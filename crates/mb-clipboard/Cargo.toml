@@ -1,16 +1,16 @@
 [package]
-name = "mb-protocol"
+name = "mb-clipboard"
 version.workspace = true
 edition.workspace = true
 rust-version.workspace = true
 license.workspace = true
-description = "MouseBridge wire protocol: framing, versioning and message codec."
+description = "Clipboard content model and synchronisation rules for MouseBridge."
 
+# No logger, for the same reason as `mb-input`: clipboard contents must never
+# reach a log, and the surest way to guarantee that is to have nothing to log to.
 [dependencies]
 mb-types = { workspace = true }
-mb-input = { workspace = true }
 serde = { workspace = true }
-postcard = { version = "1.1", features = ["use-std"] }
 thiserror = { workspace = true }
 sha2 = "0.10"
 

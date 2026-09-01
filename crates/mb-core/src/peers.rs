@@ -303,6 +303,62 @@ impl PeerSet {
         Ok(Layout::new(screens)?)
     }
 
+    /// Converts a platform display layout into shared-space screens.
+    ///
+    /// The bridge between what an operating system reports and what the topology
+    /// works in. The per-platform unit conversion lives in
+    /// [`mb_topology::ScreenMapping`]; this only supplies the device identity and
+    /// the OS that produced the numbers.
+    #[must_use]
+    pub fn screens_from_displays(
+        device: DeviceId,
+        displays: &mb_platform::DisplayLayout,
+        os: mb_types::OsKind,
+    ) -> mb_topology::DeviceScreens {
+        mb_topology::DeviceScreens::new(
+            displays
+                .displays()
+                .iter()
+                .map(|display| {
+                    mb_topology::ScreenMapping::from_native(
+                        GlobalScreenId::new(device, display.id),
+                        display.bounds,
+                        display.scale,
+                        os,
+                    )
+                })
+                .collect(),
+        )
+    }
+
+    /// Peers whose screens are in the layout but which the cursor cannot reach.
+    ///
+    /// A peer can be perfectly connected and still be unreachable: in a chain
+    /// `A — B — C`, losing `B` leaves `C` online with no edge the cursor can
+    /// cross to get to it. Without surfacing this, the far machine simply stops
+    /// responding to the pointer and nothing explains why.
+    ///
+    /// Returns an empty list if the layout cannot be built, since there is then
+    /// nothing meaningful to say about reachability.
+    #[must_use]
+    pub fn unreachable_peers(&self, from: GlobalScreenId) -> Vec<DeviceId> {
+        let Ok(layout) = self.layout() else {
+            return Vec::new();
+        };
+        let unreachable = layout.unreachable_from(from);
+
+        let mut devices: Vec<DeviceId> = self
+            .peers
+            .iter()
+            .filter(|(_, peer)| {
+                !peer.screens.is_empty() && peer.screens.iter().all(|s| unreachable.contains(&s.id))
+            })
+            .map(|(device, _)| *device)
+            .collect();
+        devices.sort_unstable();
+        devices
+    }
+
     /// Which device owns a screen, if any peer does.
     #[must_use]
     pub fn owner_of(&self, screen: GlobalScreenId) -> Option<DeviceId> {
@@ -527,6 +583,67 @@ mod tests {
         let set = PeerSet::new(device(1), vec![screen(1, 0, 0.0, 1920.0)]);
         assert!(set.is_empty());
         assert_eq!(set.layout().expect("valid").screens().len(), 1);
+    }
+
+    #[test]
+    fn a_peer_stranded_by_a_departed_neighbour_is_reported() {
+        // The milestone 8 gap, now visible: losing the middle machine of a chain
+        // leaves the far one connected but unreachable by the cursor.
+        let mut set = chain();
+        let local = GlobalScreenId::new(device(1), ScreenId(0));
+        assert!(
+            set.unreachable_peers(local).is_empty(),
+            "chain starts intact"
+        );
+
+        set.disconnect(device(2));
+        assert_eq!(
+            set.unreachable_peers(local),
+            vec![device(3)],
+            "the far machine should be reported as stranded"
+        );
+    }
+
+    #[test]
+    fn no_peer_is_stranded_in_an_intact_chain() {
+        let set = chain();
+        assert!(
+            set.unreachable_peers(GlobalScreenId::new(device(1), ScreenId(0)))
+                .is_empty()
+        );
+    }
+
+    #[test]
+    fn platform_displays_convert_into_shared_screens() {
+        use mb_platform::{DisplayInfo, DisplayLayout};
+
+        let displays = DisplayLayout::new(vec![
+            DisplayInfo {
+                id: ScreenId(0),
+                bounds: LogicalRect::from_parts(0.0, 0.0, 2880.0, 1800.0).expect("valid"),
+                scale: Scale::new(1.5).expect("positive"),
+                is_primary: true,
+                name: None,
+            },
+            DisplayInfo {
+                id: ScreenId(1),
+                bounds: LogicalRect::from_parts(2880.0, 0.0, 1920.0, 1080.0).expect("valid"),
+                scale: Scale::new(1.0).expect("positive"),
+                is_primary: false,
+                name: None,
+            },
+        ]);
+
+        let screens =
+            PeerSet::screens_from_displays(device(2), &displays, mb_types::OsKind::Windows);
+        let placed = screens.place_at(mb_types::LogicalPoint::ZERO);
+
+        assert_eq!(placed.len(), 2);
+        // A 150% panel and a 100% panel that touch must still touch, and both
+        // must be 1920 wide in shared units.
+        assert_eq!(placed[0].bounds.size.width, 1920.0);
+        assert_eq!(placed[1].bounds.size.width, 1920.0);
+        assert!((placed[1].bounds.min_x() - placed[0].bounds.max_x()).abs() < 1e-6);
     }
 
     #[test]

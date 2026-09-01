@@ -1997,6 +1997,17 @@ dependencies = [
 ]
 
 [[package]]
+name = "mb-clipboard"
+version = "0.1.0"
+dependencies = [
+ "mb-types",
+ "proptest",
+ "serde",
+ "sha2",
+ "thiserror 2.0.20",
+]
+
+[[package]]
 name = "mb-config"
 version = "0.1.0"
 dependencies = [
@@ -2107,6 +2118,7 @@ dependencies = [
  "postcard",
  "proptest",
  "serde",
+ "sha2",
  "thiserror 2.0.20",
 ]
 
@@ -2114,6 +2126,7 @@ dependencies = [
 name = "mb-security"
 version = "0.1.0"
 dependencies = [
+ "getrandom 0.3.4",
  "mb-types",
  "proptest",
  "rcgen",
@@ -2133,6 +2146,18 @@ dependencies = [
  "mb-types",
  "proptest",
  "serde",
+ "thiserror 2.0.20",
+]
+
+[[package]]
+name = "mb-transfer"
+version = "0.1.0"
+dependencies = [
+ "mb-protocol",
+ "mb-types",
+ "proptest",
+ "serde",
+ "tempfile",
  "thiserror 2.0.20",
 ]
 

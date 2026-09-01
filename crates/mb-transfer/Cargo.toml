@@ -1,21 +1,20 @@
 [package]
-name = "mb-protocol"
+name = "mb-transfer"
 version.workspace = true
 edition.workspace = true
 rust-version.workspace = true
 license.workspace = true
-description = "MouseBridge wire protocol: framing, versioning and message codec."
+description = "File transfer state and destination-path safety for MouseBridge."
 
 [dependencies]
 mb-types = { workspace = true }
-mb-input = { workspace = true }
+mb-protocol = { workspace = true }
 serde = { workspace = true }
-postcard = { version = "1.1", features = ["use-std"] }
 thiserror = { workspace = true }
-sha2 = "0.10"
 
 [dev-dependencies]
 proptest = { workspace = true }
+tempfile = "3"
 
 [lints]
 workspace = true

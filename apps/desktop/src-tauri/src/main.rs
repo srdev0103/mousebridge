@@ -10,9 +10,11 @@
 
 mod commands;
 mod tray;
+mod window;
 
 use mb_config::ConfigStore;
 use mb_core::{Core, logging};
+use tauri::Manager as _;
 use tracing::{error, info};
 
 fn main() {
@@ -62,6 +64,9 @@ fn main() {
             commands::request_permission,
             commands::open_permission_settings,
             commands::set_device_name,
+            commands::set_sharing_enabled,
+            commands::set_switching,
+            commands::close_dashboard,
             commands::reveal_config,
         ])
         .setup(|app| {
@@ -69,14 +74,15 @@ fn main() {
             Ok(())
         })
         .on_window_event(|window, event| {
-            // Closing the window hides it rather than quitting: MouseBridge keeps
-            // running in the menu bar or system tray, which is the point of a
-            // background utility. Quit is an explicit tray action.
+            // Closing the window destroys it rather than quitting: MouseBridge
+            // keeps running in the menu bar, which is the point of a background
+            // utility. Quit is an explicit tray action.
+            //
+            // Destroyed rather than hidden because hiding reclaims nothing —
+            // the webview lives in separate system processes. See `window`.
             if let tauri::WindowEvent::CloseRequested { api, .. } = event {
                 api.prevent_close();
-                if let Err(e) = window.hide() {
-                    error!(error = %e, "could not hide the window");
-                }
+                window::hide(&window.app_handle().clone());
             }
         })
         .run(tauri::generate_context!())

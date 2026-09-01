@@ -40,6 +40,30 @@ export type StartupNotice =
   | { kind: "migrated"; from_version: number }
   | { kind: "recovered"; backup_path: string; reason: string };
 
+export interface PeerStatus {
+  id_short: string;
+  name: string;
+  /** `connected`, `degraded`, or `unreachable`. */
+  state: string;
+  missed_heartbeats: number;
+  active: boolean;
+  /**
+   * Connected, but no path of screens reaches it.
+   *
+   * Shown distinctly from "disconnected": the machine is fine, the route is
+   * gone, and the fix is to rearrange screens rather than to reconnect.
+   */
+  unreachable: boolean;
+  screen_count: number;
+  latency_ms: number | null;
+}
+
+export type SharingBlocker =
+  | { kind: "missing-permission"; permission: string }
+  | { kind: "no-peers" }
+  | { kind: "disabled-by-user" }
+  | { kind: "invalid-layout"; detail: string };
+
 export interface CoreStatus {
   device: DeviceStatus;
   permissions: PermissionEntry[];
@@ -49,4 +73,13 @@ export interface CoreStatus {
   sharing_ready: boolean;
   config_path: string;
   notice: StartupNotice | null;
+  peers: PeerStatus[];
+  /**
+   * Every reason sharing cannot happen, not just the first.
+   *
+   * Showing one at a time sends the user round a loop: fix this, be told about
+   * the next.
+   */
+  blockers: SharingBlocker[];
+  sharing_enabled: boolean;
 }

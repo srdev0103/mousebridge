@@ -6,10 +6,11 @@ the pointer past the edge of one screen and it continues on the next machine.
 Windows and macOS. An original implementation — no code, protocol or assets are
 taken from any existing software KVM.
 
-> **Status: milestone 8 of 14.** One keyboard drives several computers, connected
-> in a chain, with the cursor crossing between them at screen edges. Verified end
-> to end in headless tests over real connections — not yet on physical machines.
-> See [Roadmap](#roadmap).
+> **Status: milestone 13 of 14.** One keyboard drives several computers, each with
+> any number of monitors at any scaling, crossing at screen edges, over
+> connections authenticated by a verification code the user confirms on both
+> machines. Verified end to end in headless tests over real connections — not yet
+> on physical machines. See [Roadmap](#roadmap).
 
 ## Requirements
 
@@ -94,6 +95,8 @@ crates/
   mb-net/              QUIC transport, TLS, handshake, heartbeat
   mb-discovery/        mDNS, UDP broadcast, manual addressing
   mb-topology/         screen layout, edge crossing, anti-jitter rules
+  mb-clipboard/        clipboard content, loop-breaking synchronisation
+  mb-transfer/         file transfer state, destination-path safety
 docs/
   adr/                 architecture decision records
   platform-validation.md   what has actually been tested, and where
@@ -125,10 +128,10 @@ older schema would discard settings permanently.
 | 6 | Remote mouse and keyboard | **works end to end; needs two machines to sign off** |
 | 7 | Screen-edge switching | **done** |
 | 8 | Multiple computers | **done** |
-| 9 | Multiple monitors and DPI | next |
-| 10 | Pairing, verification codes, trust store | |
-| 11 | Clipboard synchronisation | |
-| 12 | File transfer | |
+| 9 | Multiple monitors and DPI | **done** |
+| 10 | Pairing, verification codes, trust store | **done** |
+| 11 | Clipboard synchronisation | **logic done; OS watchers remain** |
+| 12 | File transfer | **logic done; streaming to disk remains** |
 | 13 | Production UX | |
 | 14 | Packaging, signing, notarisation | |
 

@@ -27,6 +27,29 @@ export function setDeviceName(name: string): Promise<CoreStatus> {
   return invoke<CoreStatus>("set_device_name", { name });
 }
 
+/** Turns input sharing on or off. */
+export function setSharingEnabled(enabled: boolean): Promise<CoreStatus> {
+  return invoke<CoreStatus>("set_sharing_enabled", { enabled });
+}
+
+/** Updates the edge-crossing behaviour. Rejected values are refused by the core. */
+export function setSwitching(
+  overshoot: number,
+  cooldownMs: number,
+  cornerDeadzone: number,
+): Promise<CoreStatus> {
+  return invoke<CoreStatus>("set_switching", {
+    overshoot,
+    cooldownMs,
+    cornerDeadzone,
+  });
+}
+
+/** Closes the dashboard. The app keeps running in the menu bar. */
+export function closeDashboard(): Promise<void> {
+  return invoke("close_dashboard");
+}
+
 /** Reveals the configuration file in the system file manager. */
 export function revealConfig(): Promise<void> {
   return invoke("reveal_config");

@@ -26,7 +26,8 @@ pub use handoff::{Handoff, HandoffAction, HandoffStats};
 pub use peers::{Peer, PeerChange, PeerError, PeerSet, PeerState, ReclaimReason};
 pub use routing::{Destination, ReceiveState, Router, RouterMonitor, RouterStats};
 pub use status::{
-    CoreStatus, DisplayStatus, PermissionEntry, StartupNotice, permission_from_key, permission_key,
+    CoreStatus, DisplayStatus, PeerStatus, PermissionEntry, SharingBlocker, StartupNotice,
+    permission_from_key, permission_key,
 };
 
 /// Failures that prevent the core from starting.

@@ -51,6 +51,43 @@ pub fn set_device_name(core: State<'_, Core>, name: &str) -> CommandResult<CoreS
     core.status().map_err(|e| e.to_string())
 }
 
+/// Turns input sharing on or off, and persists the choice.
+#[tauri::command]
+pub fn set_sharing_enabled(core: State<'_, Core>, enabled: bool) -> CommandResult<CoreStatus> {
+    core.update_config(|config| config.switching.enabled = enabled)
+        .map_err(|e| e.to_string())?;
+    core.status().map_err(|e| e.to_string())
+}
+
+/// Updates the edge-crossing behaviour.
+///
+/// Validation happens in the core, so a value the engine would refuse cannot be
+/// saved from the settings pane either.
+#[tauri::command]
+pub fn set_switching(
+    core: State<'_, Core>,
+    overshoot: f64,
+    cooldown_ms: u64,
+    corner_deadzone: f64,
+) -> CommandResult<CoreStatus> {
+    core.update_config(|config| {
+        config.switching.edge_overshoot_points = overshoot;
+        config.switching.cooldown_ms = cooldown_ms;
+        config.switching.corner_deadzone_points = corner_deadzone;
+    })
+    .map_err(|e| e.to_string())?;
+    core.status().map_err(|e| e.to_string())
+}
+
+/// Closes the dashboard window.
+///
+/// The application keeps running in the menu bar. See `window` for why this
+/// destroys the window rather than hiding it.
+#[tauri::command]
+pub fn close_dashboard(app: tauri::AppHandle) {
+    crate::window::hide(&app);
+}
+
 /// Reveals the configuration file in the system file manager.
 ///
 /// Implemented with the platform's own file manager rather than a Tauri plugin:
