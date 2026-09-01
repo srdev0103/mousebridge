@@ -60,13 +60,25 @@ Required before shipping:
 
 ### Windows builds
 
-**Not possible here at all.** `rustls` depends on `ring`, whose build script
-compiles C and assembly for the target, and this machine has no MSVC toolchain.
-Windows artifacts are built by `release.yml` on GitHub-hosted runners —
-`windows-latest` for x64 and `windows-11-arm` for ARM64.
+**x64 cross-builds from macOS.** An earlier note here said this was impossible;
+that was a statement about the toolchain then installed, not about the platform.
 
-Nothing in the Windows build has ever been executed. See
-`docs/platform-validation.md`.
+```sh
+brew install llvm makensis
+cargo install cargo-xwin
+cd apps/desktop
+npx tauri build --runner cargo-xwin --target x86_64-pc-windows-msvc --bundles nsis
+```
+
+Produces `MouseBridge_0.1.0_x64-setup.exe`. The installer stub is 32-bit, which is
+normal for NSIS; the payload is a PE32+ x86-64 executable, verified by extraction.
+
+**ARM64 does not cross-build**: `ring`'s build script fails for
+`aarch64-pc-windows-msvc`. `release.yml` builds it on a native `windows-11-arm`
+runner.
+
+Cross-building proves the code compiles for Windows. **Nothing in the Windows
+build has ever been executed.** See `docs/platform-validation.md`.
 
 ### Windows code signing
 

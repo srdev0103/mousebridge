@@ -128,6 +128,71 @@ pub enum ControlMessage {
     PairConfirm,
     /// This device's user rejected the pairing, or abandoned it.
     PairReject,
+
+    /// This device's screens, in shared units.
+    ///
+    /// Sent on connection and whenever displays change. Without it neither side
+    /// can build a topology, and without a topology there is no edge to cross.
+    ///
+    /// The sender converts to shared units before sending, because only it knows
+    /// what its own operating system's numbers mean. See `mb_topology::mapping`.
+    Screens {
+        /// The screens, already normalised.
+        screens: Vec<ScreenDescriptor>,
+    },
+}
+
+/// One screen, as advertised to a peer.
+#[derive(Debug, Clone, Copy, PartialEq, Serialize, Deserialize)]
+pub struct ScreenDescriptor {
+    /// The screen's index on its own device.
+    pub screen: ScreenId,
+    /// Width in shared units.
+    pub width: f64,
+    /// Height in shared units.
+    pub height: f64,
+    /// Offset from the device's top-left, in shared units.
+    pub x: f64,
+    /// Offset from the device's top-left, in shared units.
+    pub y: f64,
+    /// Backing scale factor, for the injecting side.
+    pub scale: f64,
+}
+
+impl ScreenDescriptor {
+    /// Rejects values that would produce degenerate geometry.
+    ///
+    /// # Errors
+    ///
+    /// [`ProtocolError::Invalid`] naming the field at fault.
+    pub fn validate(&self) -> Result<(), ProtocolError> {
+        if !self.width.is_finite()
+            || !self.height.is_finite()
+            || !self.x.is_finite()
+            || !self.y.is_finite()
+            || !self.scale.is_finite()
+        {
+            return Err(ProtocolError::Invalid {
+                field: "screen",
+                reason: "a dimension is not a finite number",
+            });
+        }
+        if self.width <= 0.0 || self.height <= 0.0 || self.scale <= 0.0 {
+            return Err(ProtocolError::Invalid {
+                field: "screen",
+                reason: "a dimension is zero or negative",
+            });
+        }
+        // A screen larger than any plausible wall of monitors is a malfunctioning
+        // or hostile peer, and would make the shared layout unusable.
+        if self.width > 100_000.0 || self.height > 100_000.0 {
+            return Err(ProtocolError::Invalid {
+                field: "screen",
+                reason: "screen dimensions are implausibly large",
+            });
+        }
+        Ok(())
+    }
 }
 
 /// Messages on the input stream.
@@ -265,6 +330,20 @@ impl ControlMessage {
                         field: "cursor_enter.held.keys",
                         reason: "more held keys than any keyboard can report",
                     });
+                }
+                Ok(())
+            }
+            Self::Screens { screens } => {
+                // A peer claiming hundreds of monitors is malfunctioning or
+                // probing; the layout would be unusable either way.
+                if screens.len() > 16 {
+                    return Err(ProtocolError::Invalid {
+                        field: "screens",
+                        reason: "more screens than any machine plausibly has",
+                    });
+                }
+                for screen in screens {
+                    screen.validate()?;
                 }
                 Ok(())
             }
@@ -486,6 +565,61 @@ mod tests {
             .is_ok()
         );
         assert!(InputMessage::ReleaseAll.validate().is_ok());
+    }
+
+    #[test]
+    fn screen_descriptors_round_trip() {
+        let message = ControlMessage::Screens {
+            screens: vec![ScreenDescriptor {
+                screen: ScreenId(0),
+                width: 1920.0,
+                height: 1080.0,
+                x: 0.0,
+                y: 0.0,
+                scale: 2.0,
+            }],
+        };
+        assert_eq!(round_trip(&message, "control"), message);
+        assert!(message.validate().is_ok());
+    }
+
+    #[test]
+    fn degenerate_screens_are_rejected() {
+        // These reach the topology engine, where a zero dimension divides by zero
+        // and a NaN poisons every later comparison.
+        let bad = |width: f64, height: f64, scale: f64| ScreenDescriptor {
+            screen: ScreenId(0),
+            width,
+            height,
+            x: 0.0,
+            y: 0.0,
+            scale,
+        };
+        assert!(bad(0.0, 1080.0, 1.0).validate().is_err());
+        assert!(bad(1920.0, -1.0, 1.0).validate().is_err());
+        assert!(bad(1920.0, 1080.0, 0.0).validate().is_err());
+        assert!(bad(f64::NAN, 1080.0, 1.0).validate().is_err());
+        assert!(bad(f64::INFINITY, 1080.0, 1.0).validate().is_err());
+        assert!(bad(1_000_000.0, 1080.0, 1.0).validate().is_err());
+        assert!(bad(1920.0, 1080.0, 1.0).validate().is_ok());
+    }
+
+    #[test]
+    fn an_absurd_screen_count_is_rejected() {
+        let message = ControlMessage::Screens {
+            screens: vec![
+                ScreenDescriptor {
+                    screen: ScreenId(0),
+                    width: 100.0,
+                    height: 100.0,
+                    x: 0.0,
+                    y: 0.0,
+                    scale: 1.0,
+                };
+                64
+            ],
+        };
+        assert!(message.validate().is_err());
     }
 
     #[test]

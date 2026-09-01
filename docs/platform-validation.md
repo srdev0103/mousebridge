@@ -120,20 +120,25 @@ its own identity; that needs the bundled application.
 All Windows code is **compile-checked only**. That proves signatures and types.
 It proves nothing below.
 
-Since milestone 5 the cross-check no longer covers the whole workspace. `rustls`
-depends on `ring`, whose build script compiles C and assembly for the target, and
-this development Mac has no MSVC toolchain. The check therefore runs over the
-crates that are pure Rust:
+**Correction (milestone 14): the whole workspace does cross-check, with the right
+toolchain.** Milestone 5 recorded that `mb-net`, `mb-security` and `mb-protocol`
+could not be cross-checked from macOS, because `rustls` depends on `ring`, whose
+build script compiles C and assembly for the target. That was true of the
+toolchain then installed and false as a general claim: `cargo-xwin` fetches the
+MSVC CRT and Windows SDK, and with Homebrew LLVM providing `clang-cl` and
+`llvm-lib`, `ring` compiles cleanly.
 
 ```sh
-cargo check --target x86_64-pc-windows-msvc \
-  -p mb-types -p mb-config -p mb-platform -p mb-input -p mb-input-native -p mb-core
+brew install llvm makensis
+cargo install cargo-xwin
+cargo xwin check --workspace --target x86_64-pc-windows-msvc   # passes
 ```
 
-**`mb-net`, `mb-security` and `mb-protocol` are not cross-checked for Windows at
-all.** They must be built and tested on a Windows machine or a Windows CI runner
-before anything about them is described as working there. This is a real
-reduction in local coverage introduced by this milestone, not an oversight.
+`aarch64-pc-windows-msvc` still fails in `ring`'s build script and is covered by
+CI on a native `windows-11-arm` runner.
+
+None of this changes what has been *run*: cross-compiling proves the code builds
+for Windows, and nothing in the Windows backend has ever executed.
 
 The pure logic *is* tested, on any host: the scan-code table, wheel conversion,
 absolute-coordinate normalisation and the shell-shortcut state machine account
@@ -421,8 +426,9 @@ Blocked or unattempted:
 |---|---|---|
 | **Notarisation** | ⬜ | Needs a Developer ID certificate. Only an Apple Development one exists here. Without it Gatekeeper refuses the app on any other machine |
 | Running on Apple Silicon | ⬜ | The arm64 slice exists and has never been executed |
-| Windows x64 build | ⬜ | Cannot build here; `ring` needs an MSVC toolchain |
-| Windows ARM64 build | ⬜ | Same |
+| Windows x64 build | ✅ | Cross-built from macOS with `cargo-xwin`; NSIS installer produced and its payload verified as PE32+ x86-64 |
+| Windows x64 app *runs* | ⬜ | Built, never executed |
+| Windows ARM64 build | ⬜ | `ring` build script fails for this target; CI covers it natively |
 | Windows installer signing | ⬜ | No certificate |
 | Automatic updates | ⬜ | Deliberately not configured |
 

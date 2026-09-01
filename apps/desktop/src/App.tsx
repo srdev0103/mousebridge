@@ -1,9 +1,12 @@
 import { useState } from "react";
 import { closeDashboard, revealConfig, setDeviceName, setSharingEnabled } from "./ipc/commands";
 import { useStatus } from "./ipc/useStatus";
+import { useEngine } from "./ipc/useEngine";
 import type { StartupNotice } from "./ipc/types";
 import { Button, Card, Row } from "./components/Card";
 import { Blockers } from "./components/Blockers";
+import { Network } from "./components/Network";
+import { Pairing } from "./components/Pairing";
 import { DisplayMap } from "./components/DisplayMap";
 import { LayoutEditor } from "./components/LayoutEditor";
 import { PeerList } from "./components/PeerList";
@@ -12,6 +15,7 @@ import { Settings } from "./components/Settings";
 
 export default function App() {
   const { status, error, refresh } = useStatus();
+  const { snapshot, refresh: refreshEngine } = useEngine();
   const [draftName, setDraftName] = useState<string | null>(null);
 
   if (error && !status) {
@@ -88,9 +92,34 @@ export default function App() {
         )}
       </div>
 
-      <Card title={`Your Computers (${status.peers.length})`}>
-        <PeerList peers={status.peers} />
+      {snapshot?.pairing && (
+        <Pairing pairing={snapshot.pairing} onChanged={() => void refreshEngine()} />
+      )}
+
+      <Card
+        title="Other Computers"
+        action={
+          snapshot && (
+            <span className="text-xs text-[var(--color-ink-muted)] tabular-nums">
+              port {snapshot.port}
+            </span>
+          )
+        }
+      >
+        {snapshot ? (
+          <Network snapshot={snapshot} onChanged={() => void refreshEngine()} />
+        ) : (
+          <p className="text-sm text-red-500">
+            Sharing did not start. Check the log below.
+          </p>
+        )}
       </Card>
+
+      {status.peers.length > 0 && (
+        <Card title="Connected">
+          <PeerList peers={status.peers} />
+        </Card>
+      )}
 
       <Card title="This Computer">
         <div className="mb-3">
@@ -148,6 +177,28 @@ export default function App() {
           {status.config_path}
         </p>
       </Card>
+
+      {snapshot && (
+        <Card title="Activity">
+          <p className="mb-2 text-xs text-[var(--color-ink-muted)]">
+            {snapshot.capturing
+              ? `Reading input · sending to ${
+                  snapshot.input_destination === "local"
+                    ? "this computer"
+                    : snapshot.input_destination
+                }`
+              : (snapshot.capture_error ?? "Not reading input")}
+          </p>
+          <ul className="max-h-40 space-y-0.5 overflow-y-auto text-xs text-[var(--color-ink-muted)]">
+            {snapshot.log.length === 0 && <li>Nothing yet.</li>}
+            {snapshot.log.map((line, index) => (
+              <li key={`${index}-${line}`} className="select-text">
+                {line}
+              </li>
+            ))}
+          </ul>
+        </Card>
+      )}
 
       <footer className="flex items-center justify-between border-t border-[var(--color-line)] pt-4 text-xs text-[var(--color-ink-muted)]">
         <span>MouseBridge keeps running in the menu bar when this window is closed.</span>

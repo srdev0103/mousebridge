@@ -13,9 +13,15 @@ mod tray;
 mod window;
 
 use mb_config::ConfigStore;
-use mb_core::{Core, logging};
+use mb_core::{Core, Engine, logging};
 use tauri::Manager as _;
 use tracing::{error, info};
+
+/// The engine, or nothing if it could not start.
+///
+/// Wrapped rather than stored as an `Option` directly so Tauri's state map has a
+/// concrete type to key on.
+pub struct EngineState(pub Option<Engine>);
 
 fn main() {
     // Configuration must load before logging, because it says where logs go and
@@ -57,8 +63,20 @@ fn main() {
         "starting desktop shell"
     );
 
+    // Start sharing. A failure here is reported and survived: the dashboard has
+    // to stay up so it can explain what went wrong, and most failures are a
+    // permission the user has not granted yet.
+    let engine = match Engine::start(&core) {
+        Ok(engine) => Some(engine),
+        Err(e) => {
+            error!(error = %e, "could not start sharing");
+            None
+        }
+    };
+
     tauri::Builder::default()
         .manage(core)
+        .manage(EngineState(engine))
         .invoke_handler(tauri::generate_handler![
             commands::get_status,
             commands::request_permission,
@@ -68,6 +86,11 @@ fn main() {
             commands::set_switching,
             commands::close_dashboard,
             commands::snap_block,
+            commands::engine_snapshot,
+            commands::begin_pairing,
+            commands::confirm_pairing,
+            commands::reject_pairing,
+            commands::forget_device,
             commands::reveal_config,
         ])
         .setup(|app| {

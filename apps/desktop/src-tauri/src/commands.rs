@@ -13,9 +13,20 @@ use tracing::warn;
 type CommandResult<T> = Result<T, String>;
 
 /// Returns the current application status.
+///
+/// Peers come from the engine rather than the core: the core owns configuration
+/// and the platform, and knows nothing about who is connected.
 #[tauri::command]
-pub fn get_status(core: State<'_, Core>) -> CommandResult<CoreStatus> {
-    core.status().map_err(|e| e.to_string())
+pub fn get_status(
+    core: State<'_, Core>,
+    engine: State<'_, crate::EngineState>,
+) -> CommandResult<CoreStatus> {
+    let peers = engine
+        .0
+        .as_ref()
+        .map(mb_core::Engine::peer_statuses)
+        .unwrap_or_default();
+    core.status_with(peers).map_err(|e| e.to_string())
 }
 
 /// Asks the OS to prompt for a permission.
@@ -49,6 +60,64 @@ pub fn set_device_name(core: State<'_, Core>, name: &str) -> CommandResult<CoreS
     core.update_config(|config| config.device.name = validated)
         .map_err(|e| e.to_string())?;
     core.status().map_err(|e| e.to_string())
+}
+
+/// Returns what the engine is currently doing.
+///
+/// Separate from [`get_status`] because the two change at different rates and
+/// for different reasons: configuration is edited by the user, whereas discovery
+/// and pairing move on their own.
+#[tauri::command]
+pub fn engine_snapshot(
+    engine: State<'_, crate::EngineState>,
+) -> CommandResult<mb_core::EngineSnapshot> {
+    engine
+        .0
+        .as_ref()
+        .map(mb_core::Engine::snapshot)
+        .ok_or_else(|| "sharing did not start; see the log".to_owned())
+}
+
+/// Begins pairing with a machine seen on the network.
+#[tauri::command]
+pub fn begin_pairing(engine: State<'_, crate::EngineState>, id: &str) -> CommandResult<()> {
+    engine
+        .0
+        .as_ref()
+        .ok_or_else(|| "sharing is not running".to_owned())?
+        .begin_pairing(id)
+}
+
+/// Records the user confirming that the codes match on both screens.
+#[tauri::command]
+pub fn confirm_pairing(engine: State<'_, crate::EngineState>) -> CommandResult<()> {
+    engine
+        .0
+        .as_ref()
+        .ok_or_else(|| "sharing is not running".to_owned())?
+        .confirm_pairing();
+    Ok(())
+}
+
+/// Abandons a pairing attempt.
+#[tauri::command]
+pub fn reject_pairing(engine: State<'_, crate::EngineState>) -> CommandResult<()> {
+    engine
+        .0
+        .as_ref()
+        .ok_or_else(|| "sharing is not running".to_owned())?
+        .reject_pairing();
+    Ok(())
+}
+
+/// Forgets a paired device.
+#[tauri::command]
+pub fn forget_device(engine: State<'_, crate::EngineState>, id: &str) -> CommandResult<()> {
+    engine
+        .0
+        .as_ref()
+        .ok_or_else(|| "sharing is not running".to_owned())?
+        .forget(id)
 }
 
 /// A block in the layout editor, in shared coordinates.

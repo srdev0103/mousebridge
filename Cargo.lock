@@ -2024,14 +2024,18 @@ dependencies = [
 name = "mb-core"
 version = "0.1.0"
 dependencies = [
+ "if-addrs",
  "mb-config",
+ "mb-discovery",
  "mb-input",
+ "mb-input-native",
  "mb-net",
  "mb-platform",
  "mb-protocol",
  "mb-security",
  "mb-topology",
  "mb-types",
+ "mdns-sd",
  "serde",
  "serde_json",
  "tempfile",
@@ -2046,6 +2050,7 @@ dependencies = [
 name = "mb-discovery"
 version = "0.1.0"
 dependencies = [
+ "if-addrs",
  "mb-protocol",
  "mb-types",
  "mdns-sd",

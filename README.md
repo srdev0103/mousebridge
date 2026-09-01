@@ -39,11 +39,9 @@ Type-check the platform backends you cannot run locally:
 ```sh
 cargo check --target aarch64-apple-darwin
 
-# Windows: only the pure-Rust crates cross-check from macOS. `ring` compiles C
-# and assembly for the target, which needs an MSVC toolchain, so the networking
-# and security crates must be built on Windows itself.
-cargo check --target x86_64-pc-windows-msvc \
-  -p mb-types -p mb-config -p mb-platform -p mb-input -p mb-input-native -p mb-core
+# Windows x64, cross-compiled from macOS or Linux.
+# Needs: brew install llvm makensis && cargo install cargo-xwin
+cargo xwin check --workspace --target x86_64-pc-windows-msvc
 ```
 
 Inspect what the platform layer sees on this machine:

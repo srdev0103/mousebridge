@@ -140,6 +140,65 @@ impl Identity {
     }
 }
 
+/// Loads the identity from `path`, creating one if it is not there.
+///
+/// # Where the key lives
+///
+/// A file beside the configuration, readable only by the owning user. The
+/// original design said the OS keystore — Keychain on macOS, Credential Manager
+/// on Windows — and that remains the right destination. It is not there yet, and
+/// this comment exists so the gap is visible rather than forgotten: a file is
+/// readable by anything running as the same user, whereas a keystore entry is
+/// not, and on macOS moving it there also means the key survives a reinstall.
+///
+/// # Errors
+///
+/// [`SecurityError::Io`] if the file cannot be read or written, or
+/// [`SecurityError::CorruptIdentity`] if it exists but is unusable.
+pub fn load_or_create(path: &std::path::Path) -> Result<Identity, SecurityError> {
+    match std::fs::read(path) {
+        Ok(bytes) => Identity::from_pkcs8(&bytes),
+        Err(e) if e.kind() == std::io::ErrorKind::NotFound => {
+            let identity = Identity::generate()?;
+            save(&identity, path)?;
+            Ok(identity)
+        }
+        Err(e) => Err(SecurityError::Io {
+            path: path.display().to_string(),
+            detail: e.to_string(),
+        }),
+    }
+}
+
+/// Writes the private key, restricted to the owning user.
+///
+/// # Errors
+///
+/// [`SecurityError::Io`] if the file could not be written.
+pub fn save(identity: &Identity, path: &std::path::Path) -> Result<(), SecurityError> {
+    let io = |e: std::io::Error| SecurityError::Io {
+        path: path.display().to_string(),
+        detail: e.to_string(),
+    };
+    if let Some(parent) = path.parent() {
+        std::fs::create_dir_all(parent).map_err(io)?;
+    }
+
+    // Written to a temporary file and renamed, so a crash cannot leave a
+    // half-written key. Recovering from that would mean generating a new
+    // identity, which un-pairs the device from every peer it knows.
+    let temporary = path.with_extension("tmp");
+    std::fs::write(&temporary, identity.private_key_pkcs8().expose()).map_err(io)?;
+
+    #[cfg(unix)]
+    {
+        use std::os::unix::fs::PermissionsExt as _;
+        std::fs::set_permissions(&temporary, std::fs::Permissions::from_mode(0o600)).map_err(io)?;
+    }
+    std::fs::rename(&temporary, path).map_err(io)?;
+    Ok(())
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -196,6 +255,52 @@ mod tests {
         let key_prefix = &identity.private_key_pkcs8().expose()[..8];
         let hex: String = key_prefix.iter().map(|b| format!("{b:02x}")).collect();
         assert!(!rendered.contains(&hex), "key material leaked into Debug");
+    }
+
+    #[test]
+    fn an_identity_persists_across_restarts() {
+        // The property every pairing depends on: restarting must not change who
+        // this computer is, or every peer sees a stranger and refuses it.
+        let dir = tempfile::tempdir().expect("tempdir");
+        let path = dir.path().join("identity.key");
+
+        let first = load_or_create(&path).expect("creates");
+        let second = load_or_create(&path).expect("loads");
+        assert_eq!(first.device_id(), second.device_id());
+        assert_eq!(first.certificate(), second.certificate());
+    }
+
+    #[cfg(unix)]
+    #[test]
+    fn the_key_file_is_not_readable_by_other_accounts() {
+        use std::os::unix::fs::PermissionsExt as _;
+        let dir = tempfile::tempdir().expect("tempdir");
+        let path = dir.path().join("identity.key");
+        load_or_create(&path).expect("creates");
+
+        let mode = std::fs::metadata(&path)
+            .expect("metadata")
+            .permissions()
+            .mode();
+        assert_eq!(
+            mode & 0o077,
+            0,
+            "the private key is readable by other users"
+        );
+    }
+
+    #[test]
+    fn a_corrupt_key_file_is_reported_not_replaced() {
+        // Silently generating a new identity would un-pair the device from every
+        // peer, and the reconnection would look like an ordinary first pairing.
+        let dir = tempfile::tempdir().expect("tempdir");
+        let path = dir.path().join("identity.key");
+        std::fs::write(&path, b"not a key").expect("writes");
+
+        assert!(matches!(
+            load_or_create(&path),
+            Err(SecurityError::CorruptIdentity { .. })
+        ));
     }
 
     #[test]

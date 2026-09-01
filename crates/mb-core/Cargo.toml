@@ -14,7 +14,12 @@ mb-input = { workspace = true }
 mb-protocol = { workspace = true }
 mb-net = { workspace = true }
 mb-topology = { workspace = true }
-tokio = { version = "1", features = ["rt", "sync", "time", "macros"] }
+mb-discovery = { workspace = true }
+if-addrs = "0.15"
+mdns-sd = "0.21"
+mb-security = { workspace = true }
+mb-input-native = { workspace = true }
+tokio = { version = "1", features = ["rt", "rt-multi-thread", "sync", "time", "macros"] }
 serde = { workspace = true }
 thiserror = { workspace = true }
 tracing = { workspace = true }
@@ -25,7 +30,6 @@ tracing-appender = { workspace = true }
 tempfile = "3"
 serde_json = "1"
 tokio = { version = "1", features = ["rt-multi-thread", "macros", "time", "sync"] }
-mb-security = { workspace = true }
 
 [lints]
 workspace = true

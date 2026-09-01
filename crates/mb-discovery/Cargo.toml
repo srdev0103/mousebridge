@@ -15,6 +15,7 @@ thiserror = { workspace = true }
 tracing = { workspace = true }
 tokio = { version = "1", features = ["rt", "net", "sync", "time", "macros"] }
 socket2 = "0.6"
+if-addrs = "0.15"
 mdns-sd = "0.21"
 
 [dev-dependencies]

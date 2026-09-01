@@ -138,16 +138,39 @@ impl BeaconSocket {
 
     /// Broadcasts an announcement to the local network.
     ///
+    /// Sends to the limited broadcast address **and** to each interface's own
+    /// subnet-directed broadcast address.
+    ///
+    /// # Why both
+    ///
+    /// `255.255.255.255` is the obvious choice and is not reliable on its own. It
+    /// is never routed, and on a host with several interfaces the stack picks one
+    /// to send it from — often not the one the other machine is on. A subnet
+    /// broadcast such as `192.168.1.255` is delivered per interface and works
+    /// where the limited broadcast quietly does not.
+    ///
+    /// Sending to both costs two small datagrams and removes a failure that
+    /// presents as "the other computer is invisible, with no error anywhere".
+    ///
     /// # Errors
     ///
-    /// As [`BeaconSocket::announce_to`].
+    /// Returns the first failure, after attempting every address. A single
+    /// interface refusing broadcast must not stop the others.
     pub async fn broadcast(
         &self,
         announcement: &Announcement,
         port: u16,
     ) -> Result<(), SocketError> {
-        self.announce_to(announcement, SocketAddr::from((BROADCAST_ADDRESS, port)))
-            .await
+        let mut first_error = None;
+
+        for address in broadcast_targets(port) {
+            if let Err(e) = self.announce_to(announcement, address).await
+                && first_error.is_none()
+            {
+                first_error = Some(e);
+            }
+        }
+        first_error.map_or(Ok(()), Err)
     }
 
     /// Waits for the next valid announcement.
@@ -187,6 +210,37 @@ impl BeaconSocket {
             }
         }
     }
+}
+
+/// Every address an announcement should be sent to.
+///
+/// The limited broadcast first, then one subnet-directed broadcast per IPv4
+/// interface that has one. Loopback is skipped: a peer reachable only over
+/// loopback is this machine.
+#[must_use]
+pub fn broadcast_targets(port: u16) -> Vec<SocketAddr> {
+    let mut targets = vec![SocketAddr::from((BROADCAST_ADDRESS, port))];
+
+    let Ok(interfaces) = if_addrs::get_if_addrs() else {
+        return targets;
+    };
+
+    for interface in interfaces {
+        if interface.is_loopback() {
+            continue;
+        }
+        let if_addrs::IfAddr::V4(v4) = interface.addr else {
+            continue;
+        };
+        let Some(broadcast) = v4.broadcast else {
+            continue;
+        };
+        let target = SocketAddr::from((broadcast, port));
+        if !targets.contains(&target) {
+            targets.push(target);
+        }
+    }
+    targets
 }
 
 #[cfg(test)]
@@ -272,6 +326,39 @@ mod tests {
             "a second listener could not share the port: {:?}",
             second.err()
         );
+    }
+
+    #[test]
+    fn broadcast_targets_always_include_the_limited_address() {
+        let targets = broadcast_targets(25471);
+        assert!(
+            targets.contains(&SocketAddr::from((BROADCAST_ADDRESS, 25471))),
+            "the limited broadcast address must always be tried"
+        );
+        assert!(targets.iter().all(|t| t.port() == 25471));
+    }
+
+    #[test]
+    fn broadcast_targets_are_unique_and_exclude_loopback() {
+        let targets = broadcast_targets(25471);
+        let mut seen = targets.clone();
+        seen.sort();
+        seen.dedup();
+        assert_eq!(seen.len(), targets.len(), "duplicate broadcast target");
+        assert!(
+            !targets.iter().any(|t| t.ip().is_loopback()),
+            "a peer reachable only over loopback is this machine"
+        );
+    }
+
+    #[test]
+    fn this_machine_has_at_least_one_subnet_broadcast() {
+        // Informational rather than a hard requirement: a machine with no
+        // network at all legitimately has none. Printed so a discovery problem
+        // can be diagnosed from the test output.
+        let targets = broadcast_targets(25471);
+        eprintln!("broadcast targets on this host: {targets:?}");
+        assert!(!targets.is_empty());
     }
 
     #[tokio::test]

@@ -36,7 +36,24 @@ pub const MOTION_LEN: usize = 16;
 /// distinguishing this from a future datagram type.
 pub const MOTION_KIND: u8 = 0x01;
 
-/// A pointer position, resolved into the receiving device's coordinate space.
+/// Largest value of a normalised motion coordinate.
+///
+/// Positions travel as a fraction of the target screen scaled to this range,
+/// which is the same convention `SendInput` uses for absolute positioning.
+pub const MOTION_SCALE: i32 = 65535;
+
+/// A pointer position within the screen the cursor is on.
+///
+/// # The coordinates are normalised, not pixels
+///
+/// `x` and `y` are the position *within the target screen*, as a fraction from
+/// `0` to [`MOTION_SCALE`].
+///
+/// Sending pixels does not work, and getting this wrong produced a pointer that
+/// went nowhere useful: the sender knows its own screen in its own units, and the
+/// receiver's screen is a different size at a different scale factor. Only the
+/// receiver knows how to turn a position into one of its own pixels. Normalising
+/// puts that conversion where the information is.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub struct Motion {
     /// Wrapping counter, for discarding reordered packets.
@@ -47,10 +64,46 @@ pub struct Motion {
     /// clocks are unrelated. It wraps about every 71 minutes, which is
     /// immaterial for measuring a single hop.
     pub timestamp_us: u32,
-    /// Horizontal position in the receiver's coordinate space.
+    /// Horizontal position across the target screen, `0..=`[`MOTION_SCALE`].
     pub x: i32,
-    /// Vertical position in the receiver's coordinate space.
+    /// Vertical position down the target screen, `0..=`[`MOTION_SCALE`].
     pub y: i32,
+}
+
+impl Motion {
+    /// Builds a datagram from a normalised position.
+    ///
+    /// Values outside `0.0..=1.0` are clamped: a position off the edge of the
+    /// target screen is not a place the pointer can go.
+    #[must_use]
+    pub fn from_normalized(seq: u16, timestamp_us: u32, nx: f64, ny: f64) -> Self {
+        #[allow(
+            clippy::cast_possible_truncation,
+            reason = "clamped to 0..=65535 before conversion"
+        )]
+        let scale = |value: f64| {
+            if value.is_nan() {
+                return 0;
+            }
+            (value.clamp(0.0, 1.0) * f64::from(MOTION_SCALE)).round() as i32
+        };
+        Self {
+            seq,
+            timestamp_us,
+            x: scale(nx),
+            y: scale(ny),
+        }
+    }
+
+    /// The position as a fraction of the target screen.
+    #[must_use]
+    pub fn normalized(&self) -> (f64, f64) {
+        let scale = f64::from(MOTION_SCALE);
+        (
+            (f64::from(self.x) / scale).clamp(0.0, 1.0),
+            (f64::from(self.y) / scale).clamp(0.0, 1.0),
+        )
+    }
 }
 
 impl Motion {
@@ -213,6 +266,34 @@ mod tests {
         let mut bytes = sample().to_bytes().to_vec();
         bytes.extend_from_slice(&[0xAA; 32]);
         assert_eq!(Motion::decode(&bytes), Ok(sample()));
+    }
+
+    #[test]
+    fn normalised_positions_round_trip() {
+        for (nx, ny) in [(0.0, 0.0), (0.5, 0.25), (1.0, 1.0), (0.999, 0.001)] {
+            let motion = Motion::from_normalized(1, 0, nx, ny);
+            let (bx, by) = motion.normalized();
+            assert!((bx - nx).abs() < 1e-4, "{nx} -> {bx}");
+            assert!((by - ny).abs() < 1e-4, "{ny} -> {by}");
+        }
+    }
+
+    #[test]
+    fn positions_off_the_target_screen_are_clamped() {
+        // A position outside the screen is not somewhere the pointer can go, and
+        // an unclamped value would be injected as a wild jump.
+        let motion = Motion::from_normalized(1, 0, -5.0, 12.0);
+        assert_eq!(motion.x, 0);
+        assert_eq!(motion.y, MOTION_SCALE);
+
+        let nan = Motion::from_normalized(1, 0, f64::NAN, 0.5);
+        assert_eq!(nan.x, 0, "a NaN reached the wire");
+    }
+
+    #[test]
+    fn the_extremes_map_to_the_full_range() {
+        let far = Motion::from_normalized(1, 0, 1.0, 1.0);
+        assert_eq!((far.x, far.y), (MOTION_SCALE, MOTION_SCALE));
     }
 
     #[test]

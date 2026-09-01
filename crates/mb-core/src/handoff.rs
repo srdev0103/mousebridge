@@ -180,6 +180,19 @@ impl Handoff {
             .map(|state| state.cursor.screen())
     }
 
+    /// Where the cursor sits within its screen, each axis in `0.0..=1.0`.
+    ///
+    /// This is what travels to the machine receiving input. A fraction rather
+    /// than a coordinate, because the two screens are different sizes at
+    /// different scale factors, and only the receiver can turn a position into
+    /// one of its own pixels.
+    #[must_use]
+    pub fn cursor_normalized(&self) -> Option<(f64, f64)> {
+        let state = self.state.try_lock().ok()?;
+        let screen = state.layout.get(state.cursor.screen())?;
+        Some(screen.bounds.normalize(state.cursor.position()))
+    }
+
     /// Replaces the layout, re-placing the cursor if its screen is gone.
     ///
     /// Called on display hotplug and when the user edits the arrangement.
@@ -291,6 +304,42 @@ mod tests {
             }
         }
         last
+    }
+
+    #[test]
+    fn the_normalised_position_tracks_the_cursor() {
+        // What actually travels to the other machine. A stale or zeroed value
+        // here puts the remote pointer in the wrong place, or nowhere.
+        let handoff = handoff();
+        let start = handoff.cursor_normalized().expect("has a position");
+        assert!((start.0 - 0.5).abs() < 0.01, "starts centred: {start:?}");
+
+        let _ = handoff.movement(400.0, 0.0, Instant::now());
+        let moved = handoff.cursor_normalized().expect("has a position");
+        assert!(
+            moved.0 > start.0,
+            "moving right did not change the position"
+        );
+        assert!((0.0..=1.0).contains(&moved.0));
+        assert!((0.0..=1.0).contains(&moved.1));
+    }
+
+    #[test]
+    fn the_normalised_position_follows_a_crossing() {
+        // After handing over, the position must be relative to the *new* screen,
+        // or the remote pointer lands wherever the old screen's fraction happened
+        // to point.
+        let handoff = handoff();
+        let now = Instant::now();
+        let _ = handoff.movement(1000.0, 0.0, now);
+        push(&handoff, 5.0, 40, now);
+        assert_eq!(handoff.destination(), Destination::Remote);
+
+        let entry = handoff.cursor_normalized().expect("has a position");
+        assert!(
+            entry.0 < 0.05,
+            "should be at the left edge of the new screen: {entry:?}"
+        );
     }
 
     #[test]

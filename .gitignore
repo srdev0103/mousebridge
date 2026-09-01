@@ -23,3 +23,6 @@ apps/desktop/src-tauri/target/
 # Editor
 .idea/
 *.swp
+
+# Built installers
+/dist/

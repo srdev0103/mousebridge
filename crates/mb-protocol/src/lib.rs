@@ -44,6 +44,6 @@ pub mod version;
 pub use chunking::{CHUNK_SIZE, Chunk, ChunkedOffer, Reassembler, split};
 pub use error::ProtocolError;
 pub use frame::{MAX_FRAME_LEN, decode_frame, encode_frame};
-pub use message::{ControlMessage, Hello, InputMessage, SessionMessage};
+pub use message::{ControlMessage, Hello, InputMessage, ScreenDescriptor, SessionMessage};
 pub use motion::{MOTION_LEN, Motion};
 pub use version::{PROTOCOL_VERSION, Version, VersionRange};

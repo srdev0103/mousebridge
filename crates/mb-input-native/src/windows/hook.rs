@@ -52,8 +52,16 @@ use windows::Win32::UI::WindowsAndMessaging::{
 
 /// `LLKHF_EXTENDED` — the key carried an `E0` prefix.
 const LLKHF_EXTENDED: u32 = 0x01;
-/// `LLKHF_INJECTED` / `LLMHF_INJECTED` — the event was synthesised, not typed.
-const LLHF_INJECTED: u32 = 0x10;
+/// `LLMHF_INJECTED` — a *mouse* event was synthesised rather than moved.
+///
+/// Deliberately separate from the keyboard flag below: they are different bits,
+/// and using the keyboard value for mouse events means every injected pointer
+/// move looks physical. On a machine receiving remote input that is a feedback
+/// loop — it captures the motion it just injected and sends it back.
+const LLMHF_INJECTED: u32 = 0x01;
+
+/// `LLKHF_INJECTED` — a *keyboard* event was synthesised rather than typed.
+const LLKHF_INJECTED: u32 = 0x10;
 
 /// Written into `dwExtraInfo` on every event this application injects, so the
 /// hook can recognise its own output.
@@ -216,8 +224,10 @@ fn offer(state: &HookState, event: &InputEvent) -> Disposition {
 /// Both our own injected events and any other application's are ignored. A
 /// software KVM forwards what the user physically did; replaying another
 /// program's automation across machines is neither expected nor wanted.
-const fn is_synthetic(flags: u32, extra_info: usize) -> bool {
-    flags & LLHF_INJECTED != 0 || extra_info == INJECTION_MARKER
+///
+/// `injected_flag` differs between the two hooks — see [`LLMHF_INJECTED`].
+const fn is_synthetic(flags: u32, injected_flag: u32, extra_info: usize) -> bool {
+    flags & injected_flag != 0 || extra_info == INJECTION_MARKER
 }
 
 /// `WH_MOUSE_LL` procedure.
@@ -238,7 +248,7 @@ unsafe extern "system" fn mouse_proc(code: i32, wparam: WPARAM, lparam: LPARAM) 
     let message = u32::try_from(wparam.0).unwrap_or(0);
 
     let suppress = with_state(|state| {
-        if is_synthetic(info.flags, info.dwExtraInfo) {
+        if is_synthetic(info.flags, LLMHF_INJECTED, info.dwExtraInfo) {
             return false;
         }
 
@@ -325,7 +335,7 @@ unsafe extern "system" fn keyboard_proc(code: i32, wparam: WPARAM, lparam: LPARA
     let message = u32::try_from(wparam.0).unwrap_or(0);
 
     let suppress = with_state(|state| {
-        if is_synthetic(info.flags.0, info.dwExtraInfo) {
+        if is_synthetic(info.flags.0, LLKHF_INJECTED, info.dwExtraInfo) {
             return false;
         }
 

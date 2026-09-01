@@ -367,6 +367,64 @@ pub async fn forward(
     }
 }
 
+/// Forwards queued input to whichever peer is currently receiving it.
+///
+/// Unlike [`forward`], the destination can change mid-stream: the user crosses a
+/// screen edge and a different machine starts receiving. Looking the session up
+/// per event rather than capturing one at the start is what makes that possible.
+///
+/// Returns when the queue closes.
+pub async fn forward_dynamic(
+    mut events: mpsc::Receiver<InputEvent>,
+    sessions: Arc<dyn crate::engine::ActiveSession>,
+    monitor: RouterMonitor,
+) {
+    let start = std::time::Instant::now();
+    let mut sequence: u16 = 0;
+    let mut warned = false;
+
+    while let Some(event) = events.recv().await {
+        if monitor.stats().lost_transitions > 0 && !warned {
+            warned = true;
+            warn!("dropped an input transition; the peer is not keeping up");
+        }
+
+        // No active peer means the cursor is on this machine, and the router
+        // should not have queued anything. Dropping is the safe response.
+        let Some(session) = sessions.active() else {
+            continue;
+        };
+
+        let result = match &event {
+            InputEvent::MouseMove { .. } => {
+                // The topology already applied this delta and knows where the
+                // cursor now sits on the target screen. Sending that position is
+                // the whole point: accumulating deltas from an arbitrary origin
+                // produces coordinates unrelated to the receiver's screen, and a
+                // pointer that goes nowhere useful.
+                let Some((nx, ny)) = sessions.cursor_normalized() else {
+                    continue;
+                };
+                #[allow(
+                    clippy::cast_possible_truncation,
+                    reason = "wraps every 71 minutes, immaterial for one hop"
+                )]
+                let stamp = start.elapsed().as_micros() as u32;
+                sequence = sequence.wrapping_add(1);
+                session.send_motion(Motion::from_normalized(sequence, stamp, nx, ny))
+            }
+            other => match to_input_message(other) {
+                Some(message) => session.send_input(message),
+                None => Ok(()),
+            },
+        };
+
+        if let Err(e) = result {
+            debug!(error = %e, "forwarding to the active peer failed");
+        }
+    }
+}
+
 /// Applies received input to a machine, keeping track of what is held.
 ///
 /// The tracker is the recovery mechanism: [`ReceiveState::release_all`] produces

@@ -11,6 +11,7 @@
 #![forbid(unsafe_code)]
 #![cfg_attr(test, allow(clippy::unwrap_used, clippy::expect_used))]
 
+pub mod engine;
 pub mod handoff;
 pub mod logging;
 pub mod peers;
@@ -22,6 +23,7 @@ use mb_platform::{Platform, PlatformError};
 use std::sync::{Arc, RwLock};
 use tracing::{info, warn};
 
+pub use engine::{Engine, EngineSnapshot};
 pub use handoff::{Handoff, HandoffAction, HandoffStats};
 pub use peers::{Peer, PeerChange, PeerError, PeerSet, PeerState, ReclaimReason};
 pub use routing::{Destination, ReceiveState, Router, RouterMonitor, RouterStats};
@@ -39,6 +41,9 @@ pub enum CoreError {
     /// No platform backend exists for this OS.
     #[error(transparent)]
     Platform(#[from] PlatformError),
+    /// The engine could not be started.
+    #[error("could not start sharing: {0}")]
+    Engine(String),
     /// Internal state was poisoned by a panic on another thread.
     ///
     /// Surfaced rather than swallowed: a poisoned lock means a panic happened
@@ -131,6 +136,12 @@ impl Core {
         &self.inner.platform
     }
 
+    /// The directory holding configuration, keys and the trust store.
+    #[must_use]
+    pub fn config_directory(&self) -> &std::path::Path {
+        self.inner.store.directory()
+    }
+
     /// Returns a copy of the current configuration.
     ///
     /// # Errors
@@ -180,12 +191,22 @@ impl Core {
     /// than as errors, so a transient display query failure does not blank the
     /// entire dashboard.
     pub fn status(&self) -> Result<CoreStatus, CoreError> {
+        self.status_with(Vec::new())
+    }
+
+    /// Builds the snapshot including connected peers.
+    ///
+    /// # Errors
+    ///
+    /// As [`Core::status`].
+    pub fn status_with(&self, peers: Vec<PeerStatus>) -> Result<CoreStatus, CoreError> {
         let config = self.config()?;
-        Ok(CoreStatus::build(
+        Ok(CoreStatus::build_with(
             &config,
             self.inner.platform.as_ref(),
             self.inner.store.path(),
             self.inner.notice.clone(),
+            peers,
         ))
     }
 }
