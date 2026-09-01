@@ -13,8 +13,10 @@ tauri-build = { workspace = true }
 mb-core = { workspace = true }
 mb-config = { workspace = true }
 mb-platform = { workspace = true }
+mb-topology = { workspace = true }
 mb-types = { workspace = true }
 tauri = { workspace = true }
+serde = { workspace = true }
 tracing = { workspace = true }
 
 [lints]

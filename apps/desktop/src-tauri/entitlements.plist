@@ -1,0 +1,38 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
+<plist version="1.0">
+<dict>
+	<!--
+	  The App Sandbox is deliberately absent.
+
+	  A sandboxed application cannot create a CoreGraphics event tap at the HID
+	  location, which is the entire mechanism this product is built on, and cannot
+	  open arbitrary outbound connections on the local network. Requesting the
+	  sandbox and then failing to work would be worse than not requesting it.
+
+	  Access is instead gated by TCC: the user grants Accessibility and Input
+	  Monitoring explicitly, and can revoke either at any time.
+	-->
+
+	<!--
+	  The Hardened Runtime is required for notarisation. These two exceptions are
+	  needed because the WebView2/WKWebView runtime JIT-compiles JavaScript.
+	-->
+	<key>com.apple.security.cs.allow-jit</key>
+	<true/>
+	<key>com.apple.security.cs.allow-unsigned-executable-memory</key>
+	<true/>
+
+	<!--
+	  Not requested, and worth stating so a future reader does not add them
+	  speculatively:
+
+	  * `com.apple.security.cs.disable-library-validation` — nothing loads
+	    third-party plugins.
+	  * `com.apple.security.automation.apple-events` — nothing scripts other
+	    applications.
+	  * `com.apple.security.device.input-monitoring` — a sandbox entitlement,
+	    meaningless outside the sandbox. Input Monitoring is a TCC grant here.
+	-->
+</dict>
+</plist>

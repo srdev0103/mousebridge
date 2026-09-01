@@ -18,10 +18,12 @@
 #![forbid(unsafe_code)]
 #![cfg_attr(test, allow(clippy::unwrap_used, clippy::expect_used))]
 
+pub mod arrange;
 pub mod cursor;
 pub mod layout;
 pub mod mapping;
 
+pub use arrange::{SNAP_DISTANCE, SnapResult, normalise, overlaps_any, snap};
 pub use cursor::{CursorTracker, Movement, SwitchingRules};
 pub use layout::{Layout, LayoutError, PlacedScreen};
 pub use mapping::{DeviceScreens, ScreenMapping};

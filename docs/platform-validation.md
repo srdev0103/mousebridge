@@ -376,6 +376,56 @@ Not yet written:
 | Multi-file transfers | ⬜ | One offer per file today |
 | Drag-and-drop UI | ⬜ | Milestone 13 |
 
+## Milestone 13 — production UX
+
+| Check | Status | Notes |
+|---|---|---|
+| The app launches with the tray installed | ✅ | Verified on macOS 15 |
+| Snapping places a near-miss flush | ✅ | A 3-point gap breaks crossing invisibly |
+| Snapping works on all four sides | ✅ | |
+| A small screen can align to either end or the centre | ✅ | Or it cannot be placed where the user means |
+| The nearest snap wins | ✅ | Not whichever block is first in the list |
+| Snapping never produces an overlap | ✅ | |
+| A drop with nowhere to snap is flagged, not rescued | ✅ | The editor shows it as invalid |
+| A snapped arrangement builds a valid, adjacent layout | ✅ | End to end through the topology engine |
+| Every sharing blocker is reported at once | ✅ | Not one at a time |
+| Having no peers is itself a blocker | ✅ | "Ready" with nothing to share with is a lie |
+
+Needing a person at the machine:
+
+| Check | Status | Notes |
+|---|---|---|
+| **Does closing the window release the webview processes?** | ⬜ | Implemented, unverified — see the memory note above |
+| Dragging in the editor feels right | ⬜ | Snap distance of 120 points is a guess |
+| The tray sharing toggle reflects state correctly | ⬜ | |
+| Onboarding for a first-time user | ⬜ | Not built |
+| The pairing prompt UI | ⬜ | Not built; the protocol and codes are |
+| Connection diagnostics pane | ⬜ | Not built |
+
+## Milestone 14 — packaging
+
+| Check | Status | Notes |
+|---|---|---|
+| **Universal 2 binary contains both architectures** | ✅ | `lipo -info` reports `x86_64 arm64` |
+| The bundle launches, unsigned | ✅ | |
+| Signing with the hardened runtime succeeds | ✅ | `flags=0x10000(runtime)` |
+| The signature verifies `--deep --strict` | ✅ | |
+| Entitlements are applied as written | ✅ | JIT exceptions present, sandbox absent |
+| The bundle launches after signing | ✅ | |
+| **The designated requirement is identity-based, not hash-based** | ✅ | So TCC grants survive a rebuild — resolves the risk flagged in the original assessment |
+| Bundle identifier and minimum system version are correct | ✅ | `com.mousebridge.desktop`, macOS 13.0 |
+
+Blocked or unattempted:
+
+| Check | Status | Notes |
+|---|---|---|
+| **Notarisation** | ⬜ | Needs a Developer ID certificate. Only an Apple Development one exists here. Without it Gatekeeper refuses the app on any other machine |
+| Running on Apple Silicon | ⬜ | The arm64 slice exists and has never been executed |
+| Windows x64 build | ⬜ | Cannot build here; `ring` needs an MSVC toolchain |
+| Windows ARM64 build | ⬜ | Same |
+| Windows installer signing | ⬜ | No certificate |
+| Automatic updates | ⬜ | Deliberately not configured |
+
 ## Known environment limitations
 
 The development host is an Intel iMac running macOS 15.7.9 on non-Apple hardware

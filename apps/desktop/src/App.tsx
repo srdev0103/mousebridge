@@ -5,6 +5,7 @@ import type { StartupNotice } from "./ipc/types";
 import { Button, Card, Row } from "./components/Card";
 import { Blockers } from "./components/Blockers";
 import { DisplayMap } from "./components/DisplayMap";
+import { LayoutEditor } from "./components/LayoutEditor";
 import { PeerList } from "./components/PeerList";
 import { PermissionList } from "./components/PermissionList";
 import { Settings } from "./components/Settings";
@@ -119,6 +120,10 @@ export default function App() {
 
       <Card title="Permissions">
         <PermissionList permissions={status.permissions} onChanged={() => void refresh()} />
+      </Card>
+
+      <Card title="Screen Layout">
+        <LayoutEditor displays={status.displays} peers={status.peers} />
       </Card>
 
       <Card title={`Displays (${status.displays.length})`}>

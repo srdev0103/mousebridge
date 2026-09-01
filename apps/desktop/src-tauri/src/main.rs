@@ -67,6 +67,7 @@ fn main() {
             commands::set_sharing_enabled,
             commands::set_switching,
             commands::close_dashboard,
+            commands::snap_block,
             commands::reveal_config,
         ])
         .setup(|app| {

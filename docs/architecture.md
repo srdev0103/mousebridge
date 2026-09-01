@@ -209,9 +209,20 @@ Dependencies point one way. `mb-types` depends on nothing; `mb-config` and
   are hashed, so a truncated transfer never silently becomes the user's clipboard
   or a file on their disk.
 
+- **The layout editor makes no geometric decisions.** Where a dragged block comes
+  to rest, and whether the arrangement is valid, are decided by `mb-topology`
+  through a command. The interface only tracks the pointer. A one-point gap
+  between two screens is invisible at editor scale and completely breaks
+  crossing — the cursor reaches the edge, finds nothing beyond it, and stops —
+  so deciding adjacency by eye in TypeScript is how that bug ships.
+
+- **Sharing blockers are a list, not a boolean.** The honest answer is often more
+  than one thing, and surfacing them one at a time sends the user round a loop of
+  fixing something to be told about the next.
+
 ## Testing
 
-`cargo test --workspace` — 517 tests, no hardware required beyond the host.
+`cargo test --workspace` — 573 tests, no hardware required beyond the host.
 
 Nine of those are property tests over the input state machine, asserting that
 after *any* sequence of events — including sequences no real keyboard produces —

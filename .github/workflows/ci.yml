@@ -1,0 +1,77 @@
+name: CI
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+
+env:
+  CARGO_TERM_COLOR: always
+  RUSTFLAGS: -D warnings
+
+jobs:
+  # The engine. Runs on both platforms because roughly a third of the test suite
+  # is platform-independent logic that nonetheless describes platform behaviour —
+  # the two key tables, the DPI conversions, the Windows scan-code map — and a
+  # macOS-only run would never execute the Windows half.
+  test:
+    name: Test (${{ matrix.os }})
+    runs-on: ${{ matrix.os }}
+    strategy:
+      fail-fast: false
+      matrix:
+        os: [macos-14, windows-latest]
+    steps:
+      - uses: actions/checkout@v4
+      - uses: dtolnay/rust-toolchain@stable
+        with:
+          components: rustfmt, clippy
+      - uses: Swatinem/rust-cache@v2
+
+      - name: Format
+        run: cargo fmt --all --check
+
+      - name: Clippy
+        run: cargo clippy --workspace --all-targets -- -D warnings
+
+      # Includes the unsafe-code audit, which fails the build if an `unsafe`
+      # block is added without a SAFETY comment.
+      - name: Test
+        run: cargo test --workspace
+
+  # Cross-architecture type checking. Catches a signature error on a target no
+  # runner is executing.
+  cross-check:
+    name: Check ${{ matrix.target }}
+    runs-on: ${{ matrix.host }}
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - { host: macos-14, target: x86_64-apple-darwin }
+          - { host: macos-14, target: aarch64-apple-darwin }
+          - { host: windows-latest, target: aarch64-pc-windows-msvc }
+    steps:
+      - uses: actions/checkout@v4
+      - uses: dtolnay/rust-toolchain@stable
+        with:
+          targets: ${{ matrix.target }}
+      - uses: Swatinem/rust-cache@v2
+      - run: cargo check --workspace --exclude mousebridge-desktop --target ${{ matrix.target }}
+
+  frontend:
+    name: Frontend
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: apps/desktop
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 24
+          cache: npm
+          cache-dependency-path: apps/desktop/package-lock.json
+      - run: npm ci
+      - name: Type check and build
+        run: npm run build

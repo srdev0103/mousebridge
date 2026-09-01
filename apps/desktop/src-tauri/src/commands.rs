@@ -51,6 +51,69 @@ pub fn set_device_name(core: State<'_, Core>, name: &str) -> CommandResult<CoreS
     core.status().map_err(|e| e.to_string())
 }
 
+/// A block in the layout editor, in shared coordinates.
+#[derive(Debug, Clone, Copy, serde::Serialize, serde::Deserialize)]
+pub struct EditorBlock {
+    /// Left edge.
+    pub x: f64,
+    /// Top edge.
+    pub y: f64,
+    /// Width.
+    pub width: f64,
+    /// Height.
+    pub height: f64,
+}
+
+impl EditorBlock {
+    fn to_rect(self) -> Option<mb_types::LogicalRect> {
+        mb_types::LogicalRect::from_parts(self.x, self.y, self.width, self.height)
+    }
+
+    const fn from_rect(rect: mb_types::LogicalRect) -> Self {
+        Self {
+            x: rect.origin.x,
+            y: rect.origin.y,
+            width: rect.size.width,
+            height: rect.size.height,
+        }
+    }
+}
+
+/// Where a dragged block should come to rest.
+#[derive(Debug, Clone, Copy, serde::Serialize)]
+pub struct SnapOutcome {
+    /// The resting position.
+    pub block: EditorBlock,
+    /// Whether it attached to a neighbour.
+    pub snapped: bool,
+    /// Whether it now overlaps something, which cannot be saved.
+    pub overlapping: bool,
+}
+
+/// Places a dragged block, snapping it to its neighbours.
+///
+/// The geometry lives in `mb-topology` rather than the interface, because a
+/// one-point gap between two screens is invisible on a scaled canvas and
+/// completely breaks crossing — the pointer reaches the edge and stops, with
+/// nothing on screen to explain why.
+#[tauri::command]
+pub fn snap_block(dragged: EditorBlock, others: Vec<EditorBlock>) -> CommandResult<SnapOutcome> {
+    let dragged_rect = dragged
+        .to_rect()
+        .ok_or_else(|| "a screen cannot have zero size".to_owned())?;
+    let other_rects: Vec<mb_types::LogicalRect> =
+        others.iter().filter_map(|b| b.to_rect()).collect();
+
+    let result = mb_topology::snap(dragged_rect, &other_rects);
+    let placed = mb_types::LogicalRect::new(result.origin, dragged_rect.size);
+
+    Ok(SnapOutcome {
+        block: EditorBlock::from_rect(placed),
+        snapped: result.snapped,
+        overlapping: mb_topology::overlaps_any(placed, &other_rects),
+    })
+}
+
 /// Turns input sharing on or off, and persists the choice.
 #[tauri::command]
 pub fn set_sharing_enabled(core: State<'_, Core>, enabled: bool) -> CommandResult<CoreStatus> {

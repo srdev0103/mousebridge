@@ -6,7 +6,7 @@ the pointer past the edge of one screen and it continues on the next machine.
 Windows and macOS. An original implementation — no code, protocol or assets are
 taken from any existing software KVM.
 
-> **Status: milestone 13 of 14.** One keyboard drives several computers, each with
+> **Status: milestone 14 of 14.** One keyboard drives several computers, each with
 > any number of monitors at any scaling, crossing at screen edges, over
 > connections authenticated by a verification code the user confirms on both
 > machines. Verified end to end in headless tests over real connections — not yet
@@ -133,7 +133,7 @@ older schema would discard settings permanently.
 | 11 | Clipboard synchronisation | **logic done; OS watchers remain** |
 | 12 | File transfer | **logic done; streaming to disk remains** |
 | 13 | Production UX | |
-| 14 | Packaging, signing, notarisation | |
+| 14 | Packaging, signing, notarisation | **builds verified; notarisation blocked** |
 
 Encryption is present from milestone 5, not added at 10: the transport is QUIC,
 which has no plaintext mode. Milestone 10 adds the pairing UX and key pinning on
