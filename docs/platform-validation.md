@@ -102,10 +102,23 @@ its own identity; that needs the bundled application.
 
 ### Windows
 
-All Windows code is **compile-checked only** — `cargo check --target
-x86_64-pc-windows-msvc` and `aarch64-pc-windows-msvc` are clean, and
-`clippy -D warnings` passes for both. That proves signatures and types. It proves
-nothing below.
+All Windows code is **compile-checked only**. That proves signatures and types.
+It proves nothing below.
+
+Since milestone 5 the cross-check no longer covers the whole workspace. `rustls`
+depends on `ring`, whose build script compiles C and assembly for the target, and
+this development Mac has no MSVC toolchain. The check therefore runs over the
+crates that are pure Rust:
+
+```sh
+cargo check --target x86_64-pc-windows-msvc \
+  -p mb-types -p mb-config -p mb-platform -p mb-input -p mb-input-native -p mb-core
+```
+
+**`mb-net`, `mb-security` and `mb-protocol` are not cross-checked for Windows at
+all.** They must be built and tested on a Windows machine or a Windows CI runner
+before anything about them is described as working there. This is a real
+reduction in local coverage introduced by this milestone, not an oversight.
 
 The pure logic *is* tested, on any host: the scan-code table, wheel conversion,
 absolute-coordinate normalisation and the shell-shortcut state machine account
@@ -127,6 +140,33 @@ for 20 of the passing tests and run in CI on macOS.
 | AltGr on a European layout produces accented characters | ⬜ | Mapped as extended Right Alt |
 | Injection into an elevated window fails cleanly and visibly | ⬜ | Expected to fail (UIPI). `SendInput` returns a short count, which is reported specifically — it must not fail *silently* |
 | Media keys report through the PS/2 set, not a vendor collection | ⬜ | Table entries are a best guess; some keyboards differ |
+
+## Milestone 5 — transport and discovery
+
+Verified on this machine, over real sockets:
+
+| Check | Status | Notes |
+|---|---|---|
+| Two paired devices complete a QUIC handshake | ✅ | Real TLS 1.3 over loopback UDP |
+| An unpaired device is refused | ✅ | |
+| Trust must be mutual | ✅ | A one-sided relationship is rejected |
+| A motion datagram survives the round trip | ✅ | Confirms datagram support negotiates |
+| A silent peer is dropped at the handshake timeout | ✅ | Completes TLS, never sends Hello |
+| A UDP announcement survives a socket round trip | ✅ | Loopback |
+| Foreign traffic on the discovery port is skipped | ✅ | HTTP and oversized junk do not stall discovery |
+| Two sockets can share the discovery port | ✅ | `SO_REUSEADDR` / `SO_REUSEPORT` |
+| **A live mDNS advertisement is discovered** | ✅ | Real multicast on this machine's interfaces; resolved in 0.84 s |
+
+Still unverified, and needing a second machine:
+
+| Check | Status | Notes |
+|---|---|---|
+| Discovery across two real machines | ⬜ | Loopback proves the code, not the network |
+| mDNS on consumer Wi-Fi with client isolation | ⬜ | The case broadcast fallback exists for |
+| Broadcast on a network that filters multicast | ⬜ | |
+| Connection migration across Wi-Fi ↔ Ethernet | ⬜ | A stated reason for choosing QUIC |
+| Heartbeat detects a genuinely wedged peer | ⬜ | State machine is unit tested; the wiring is not |
+| Latency under load, p50/p99 | ⬜ | Needs two physical machines; milestone 6 |
 
 ## Known environment limitations
 

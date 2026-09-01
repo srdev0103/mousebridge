@@ -7,6 +7,10 @@ members = [
     "crates/mb-core",
     "crates/mb-input",
     "crates/mb-input-native",
+    "crates/mb-protocol",
+    "crates/mb-security",
+    "crates/mb-net",
+    "crates/mb-discovery",
     "apps/desktop/src-tauri",
     "xtask",
 ]
@@ -27,6 +31,10 @@ mb-platform = { path = "crates/mb-platform" }
 mb-core = { path = "crates/mb-core" }
 mb-input = { path = "crates/mb-input" }
 mb-input-native = { path = "crates/mb-input-native" }
+mb-protocol = { path = "crates/mb-protocol" }
+mb-security = { path = "crates/mb-security" }
+mb-net = { path = "crates/mb-net" }
+mb-discovery = { path = "crates/mb-discovery" }
 
 # --- desktop runtime ---
 tauri = { version = "2.11", features = ["tray-icon"] }

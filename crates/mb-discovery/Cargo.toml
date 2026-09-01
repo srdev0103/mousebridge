@@ -1,0 +1,25 @@
+[package]
+name = "mb-discovery"
+version.workspace = true
+edition.workspace = true
+rust-version.workspace = true
+license.workspace = true
+description = "Finding MouseBridge peers on the local network."
+
+[dependencies]
+mb-types = { workspace = true }
+mb-protocol = { workspace = true }
+serde = { workspace = true }
+postcard = { version = "1.1", features = ["use-std"] }
+thiserror = { workspace = true }
+tracing = { workspace = true }
+tokio = { version = "1", features = ["rt", "net", "sync", "time", "macros"] }
+socket2 = "0.6"
+mdns-sd = "0.21"
+
+[dev-dependencies]
+tokio = { version = "1", features = ["rt-multi-thread", "macros", "time"] }
+mb-protocol = { workspace = true }
+
+[lints]
+workspace = true

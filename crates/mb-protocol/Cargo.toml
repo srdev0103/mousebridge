@@ -1,0 +1,20 @@
+[package]
+name = "mb-protocol"
+version.workspace = true
+edition.workspace = true
+rust-version.workspace = true
+license.workspace = true
+description = "MouseBridge wire protocol: framing, versioning and message codec."
+
+[dependencies]
+mb-types = { workspace = true }
+mb-input = { workspace = true }
+serde = { workspace = true }
+postcard = { version = "1.1", features = ["use-std"] }
+thiserror = { workspace = true }
+
+[dev-dependencies]
+proptest = { workspace = true }
+
+[lints]
+workspace = true

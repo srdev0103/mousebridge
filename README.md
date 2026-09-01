@@ -6,10 +6,10 @@ the pointer past the edge of one screen and it continues on the next machine.
 Windows and macOS. An original implementation — no code, protocol or assets are
 taken from any existing software KVM.
 
-> **Status: milestone 4 of 14.** Foundation, input model, and both OS input
-> backends — a CoreGraphics event tap on macOS, low-level hooks and `SendInput`
-> on Windows. There is still no networking, so it cannot yet share input between
-> computers. See [Roadmap](#roadmap).
+> **Status: milestone 5 of 14.** Foundation, input model, both OS input backends,
+> and an authenticated QUIC transport with peer discovery. The two halves are not
+> yet wired together — captured input does not travel over the network — so it
+> cannot share input between computers. See [Roadmap](#roadmap).
 
 ## Requirements
 
@@ -36,9 +36,13 @@ cd apps/desktop && npm run tauri dev
 Type-check the platform backends you cannot run locally:
 
 ```sh
-cargo check --target x86_64-pc-windows-msvc
-cargo check --target aarch64-pc-windows-msvc
 cargo check --target aarch64-apple-darwin
+
+# Windows: only the pure-Rust crates cross-check from macOS. `ring` compiles C
+# and assembly for the target, which needs an MSVC toolchain, so the networking
+# and security crates must be built on Windows itself.
+cargo check --target x86_64-pc-windows-msvc \
+  -p mb-types -p mb-config -p mb-platform -p mb-input -p mb-input-native -p mb-core
 ```
 
 Inspect what the platform layer sees on this machine:
@@ -85,6 +89,10 @@ crates/
   mb-core/             orchestration, logging, status snapshot
   mb-input/            input events, state tracking, capture/inject traits
   mb-input-native/     OS input backends (CoreGraphics event tap, injection)
+  mb-protocol/         wire format, versioning, framing, message codec
+  mb-security/         device identity, certificate pinning, trust store
+  mb-net/              QUIC transport, TLS, handshake, heartbeat
+  mb-discovery/        mDNS, UDP broadcast, manual addressing
 docs/
   adr/                 architecture decision records
   platform-validation.md   what has actually been tested, and where
@@ -112,8 +120,8 @@ older schema would discard settings permanently.
 | 2 | Input event abstraction + virtual backend | **done** |
 | 3 | macOS input capture and injection | **code complete, needs a permission grant to validate** |
 | 4 | Windows input capture and injection | **code complete, needs a Windows machine to validate** |
-| 5 | QUIC transport, discovery, heartbeat, TLS | next |
-| 6 | Remote mouse and keyboard | |
+| 5 | QUIC transport, discovery, heartbeat, TLS | **done** |
+| 6 | Remote mouse and keyboard | next |
 | 7 | Screen-edge switching | |
 | 8 | Multiple computers | |
 | 9 | Multiple monitors and DPI | |

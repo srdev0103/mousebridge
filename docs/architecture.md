@@ -69,6 +69,10 @@ Dependencies point one way. `mb-types` depends on nothing; `mb-config` and
 | `mb-input` | events, key codes, held-state tracking, backend traits | no | none (`forbid(unsafe_code)`) |
 | `mb-input-native` | OS capture and injection backends | no | isolated in `macos/`, `windows/` |
 | `mb-core` | orchestration, logging, status snapshot | no (yet) | none |
+| `mb-protocol` | wire format, versioning, framing, codecs | no | none (`forbid(unsafe_code)`) |
+| `mb-security` | identity, pinning, trust store | no | none (`forbid(unsafe_code)`) |
+| `mb-net` | QUIC transport, TLS, handshake, heartbeat | yes | none (`forbid(unsafe_code)`) |
+| `mb-discovery` | mDNS, UDP broadcast, manual peers | yes | none (`forbid(unsafe_code)`) |
 | `mousebridge-desktop` | window, tray, IPC commands | — | thin shims only |
 
 ## Decisions worth knowing
@@ -121,9 +125,24 @@ Dependencies point one way. `mb-types` depends on nothing; `mb-config` and
   round-trips perfectly on its own while potentially disagreeing with the other.
   Gating by host would hide exactly that.
 
+- **Encryption is present from milestone 5, not bolted on at 10.** QUIC has no
+  plaintext mode, so there was never a version of this transport without TLS to
+  retrofit. Milestone 10 adds the pairing UX on top of a transport that was never
+  insecure.
+
+- **Discovery ships three mechanisms because two of them fail in the field.**
+  mDNS is filtered by AP client isolation and IGMP snooping on ordinary consumer
+  Wi-Fi; broadcast is filtered on corporate networks. Manual addressing is the
+  only one that always works and is treated as a first-class feature.
+
+- **Nothing a beacon says is trusted.** Announcements are unauthenticated and
+  anyone can publish any identity. They group and display; trust comes from the
+  pinned certificate in the TLS handshake. The connect address is taken from the
+  packet, never from the payload, so a peer cannot redirect connections.
+
 ## Testing
 
-`cargo test --workspace` — 201 tests, no hardware required beyond the host.
+`cargo test --workspace` — 344 tests, no hardware required beyond the host.
 
 Nine of those are property tests over the input state machine, asserting that
 after *any* sequence of events — including sequences no real keyboard produces —

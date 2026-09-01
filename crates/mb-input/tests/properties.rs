@@ -9,6 +9,11 @@
 //! The central invariant is the product requirement stated directly:
 //! **whatever has happened, the system can always get back to holding nothing.**
 
+// Integration tests are a separate crate, so the library's test-only allow
+// does not reach here. Panicking helpers are the clearest way to express a
+// fixture that cannot fail.
+#![allow(clippy::unwrap_used, clippy::expect_used)]
+
 use mb_input::event::HeldInput;
 use mb_input::inject::{Validated, release_tracked};
 use mb_input::keycode::{PAGE_CONSUMER, PAGE_KEYBOARD};
