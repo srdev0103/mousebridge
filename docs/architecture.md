@@ -73,6 +73,7 @@ Dependencies point one way. `mb-types` depends on nothing; `mb-config` and
 | `mb-security` | identity, pinning, trust store | no | none (`forbid(unsafe_code)`) |
 | `mb-net` | QUIC transport, TLS, handshake, heartbeat | yes | none (`forbid(unsafe_code)`) |
 | `mb-discovery` | mDNS, UDP broadcast, manual peers | yes | none (`forbid(unsafe_code)`) |
+| `mb-topology` | screen layout, edge crossing, anti-jitter | no | none (`forbid(unsafe_code)`) |
 | `mousebridge-desktop` | window, tray, IPC commands | — | thin shims only |
 
 ## Decisions worth knowing
@@ -152,9 +153,21 @@ Dependencies point one way. `mb-types` depends on nothing; `mb-config` and
   and never notice the capture side going away. The connection would outlive the
   thing feeding it. Found by an end-to-end test that hung for twenty seconds.
 
+- **Arriving at an edge is never a crossing.** The first design accumulated
+  outward distance, which a single fast fling satisfies in one frame — precisely
+  the accidental crossing the rule existed to prevent. The cursor must *reach*
+  the edge and stop, and only then does continued outward motion count. Sliding
+  to a different edge restarts the count.
+
+- **The capture thread never waits for topology state.** The suppress decision
+  *is* the topology decision, so it cannot be deferred to another thread. Layout
+  state sits behind a mutex the capture thread only ever `try_lock`s; a
+  contended instant costs one event its topology update, not a stalled input
+  thread and a tap the OS disables for being slow.
+
 ## Testing
 
-`cargo test --workspace` — 369 tests, no hardware required beyond the host.
+`cargo test --workspace` — 413 tests, no hardware required beyond the host.
 
 Nine of those are property tests over the input state machine, asserting that
 after *any* sequence of events — including sequences no real keyboard produces —

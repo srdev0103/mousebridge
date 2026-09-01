@@ -2019,6 +2019,7 @@ dependencies = [
  "mb-platform",
  "mb-protocol",
  "mb-security",
+ "mb-topology",
  "mb-types",
  "serde",
  "serde_json",
@@ -2123,6 +2124,16 @@ dependencies = [
  "tempfile",
  "thiserror 2.0.20",
  "toml 1.1.4+spec-1.1.0",
+]
+
+[[package]]
+name = "mb-topology"
+version = "0.1.0"
+dependencies = [
+ "mb-types",
+ "proptest",
+ "serde",
+ "thiserror 2.0.20",
 ]
 
 [[package]]

@@ -11,6 +11,7 @@ members = [
     "crates/mb-security",
     "crates/mb-net",
     "crates/mb-discovery",
+    "crates/mb-topology",
     "apps/desktop/src-tauri",
     "xtask",
 ]
@@ -35,6 +36,7 @@ mb-protocol = { path = "crates/mb-protocol" }
 mb-security = { path = "crates/mb-security" }
 mb-net = { path = "crates/mb-net" }
 mb-discovery = { path = "crates/mb-discovery" }
+mb-topology = { path = "crates/mb-topology" }
 
 # --- desktop runtime ---
 tauri = { version = "2.11", features = ["tray-icon"] }

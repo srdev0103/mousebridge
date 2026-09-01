@@ -11,6 +11,7 @@
 #![forbid(unsafe_code)]
 #![cfg_attr(test, allow(clippy::unwrap_used, clippy::expect_used))]
 
+pub mod handoff;
 pub mod logging;
 pub mod routing;
 pub mod status;
@@ -20,6 +21,7 @@ use mb_platform::{Platform, PlatformError};
 use std::sync::{Arc, RwLock};
 use tracing::{info, warn};
 
+pub use handoff::{Handoff, HandoffAction, HandoffStats};
 pub use routing::{Destination, ReceiveState, Router, RouterMonitor, RouterStats};
 pub use status::{
     CoreStatus, DisplayStatus, PermissionEntry, StartupNotice, permission_from_key, permission_key,

@@ -13,6 +13,7 @@ mb-platform = { workspace = true }
 mb-input = { workspace = true }
 mb-protocol = { workspace = true }
 mb-net = { workspace = true }
+mb-topology = { workspace = true }
 tokio = { version = "1", features = ["rt", "sync", "time", "macros"] }
 serde = { workspace = true }
 thiserror = { workspace = true }

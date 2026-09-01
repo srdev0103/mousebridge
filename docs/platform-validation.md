@@ -196,6 +196,34 @@ Not verified, and needing real machines:
 | Input latency, p50/p99 | ⬜ | No figure has been measured. A VM cannot produce a trustworthy one |
 | Behaviour on real Wi-Fi under contention | ⬜ | Loopback has no loss and no jitter |
 
+## Milestone 7 — screen-edge switching
+
+All logic, all headless. 41 tests across `mb-topology` and the handoff
+coordinator, 7 of them property tests over arbitrary movement sequences.
+
+| Check | Status | Notes |
+|---|---|---|
+| The cursor is always inside the screen it claims to be on | ✅ | Property test, arbitrary movement |
+| The position never becomes non-finite | ✅ | Including NaN and infinite deltas |
+| A crossing lands inside the screen it reports entering | ✅ | Property test |
+| Entry positions are always within `0.0..=1.0` | ✅ | The receiver multiplies by its own screen size |
+| **No single movement ever crosses** | ✅ | However fast or far; arriving at an edge is not crossing |
+| Crossings respect the cooldown | ✅ | Property test with sub-cooldown time steps |
+| Corners are excluded | ✅ | Menu bar, Start button, close buttons |
+| Entry is proportional across mismatched screen sizes | ✅ | 4K panel to an 800-point laptop |
+| A removed screen re-places the cursor | ✅ | Rather than stranding it off-desktop |
+| Moving between two local screens is not a handoff | ✅ | Multi-monitor on one machine |
+| The capture thread never blocks on layout state | ✅ | `try_lock`, skip-and-count |
+
+Needing real hardware:
+
+| Check | Status | Notes |
+|---|---|---|
+| The crossing threshold feels right in the hand | ⬜ | 12 points is a guess; only use can tune it |
+| Corner dead zone does not block legitimate crossings | ⬜ | 8 points, likewise |
+| Crossing behaviour on a mixed-DPI arrangement | ⬜ | See ADR 0001 |
+| Handoff during an active drag | ⬜ | Button held across the boundary |
+
 ## Known environment limitations
 
 The development host is an Intel iMac running macOS 15.7.9 on non-Apple hardware

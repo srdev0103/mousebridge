@@ -1,0 +1,20 @@
+[package]
+name = "mb-topology"
+version.workspace = true
+edition.workspace = true
+rust-version.workspace = true
+license.workspace = true
+description = "Screen layout and edge-crossing detection for MouseBridge."
+
+# No async runtime and no logger, for the same reason as `mb-input`: this runs on
+# the cursor path, where an allocation or a log write is latency a user can feel.
+[dependencies]
+mb-types = { workspace = true }
+serde = { workspace = true }
+thiserror = { workspace = true }
+
+[dev-dependencies]
+proptest = { workspace = true }
+
+[lints]
+workspace = true

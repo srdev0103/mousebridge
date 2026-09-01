@@ -6,11 +6,10 @@ the pointer past the edge of one screen and it continues on the next machine.
 Windows and macOS. An original implementation — no code, protocol or assets are
 taken from any existing software KVM.
 
-> **Status: milestone 6 of 14.** Input captured on one machine now travels over an
-> authenticated connection and is injected on another — verified end to end in a
-> headless test, not yet on two physical computers. Switching between machines is
-> still manual; the screen-edge crossing that makes it feel seamless is milestone
-> 7. See [Roadmap](#roadmap).
+> **Status: milestone 7 of 14.** Input captured on one machine travels over an
+> authenticated connection to another, and the cursor crosses between them by
+> pushing past a screen edge. Verified end to end in headless tests, not yet on
+> two physical computers. See [Roadmap](#roadmap).
 
 ## Requirements
 
@@ -94,6 +93,7 @@ crates/
   mb-security/         device identity, certificate pinning, trust store
   mb-net/              QUIC transport, TLS, handshake, heartbeat
   mb-discovery/        mDNS, UDP broadcast, manual addressing
+  mb-topology/         screen layout, edge crossing, anti-jitter rules
 docs/
   adr/                 architecture decision records
   platform-validation.md   what has actually been tested, and where
@@ -123,8 +123,8 @@ older schema would discard settings permanently.
 | 4 | Windows input capture and injection | **code complete, needs a Windows machine to validate** |
 | 5 | QUIC transport, discovery, heartbeat, TLS | **done** |
 | 6 | Remote mouse and keyboard | **works end to end; needs two machines to sign off** |
-| 7 | Screen-edge switching | next |
-| 8 | Multiple computers | |
+| 7 | Screen-edge switching | **done** |
+| 8 | Multiple computers | next |
 | 9 | Multiple monitors and DPI | |
 | 10 | Pairing, verification codes, trust store | |
 | 11 | Clipboard synchronisation | |
