@@ -165,9 +165,24 @@ Dependencies point one way. `mb-types` depends on nothing; `mb-config` and
   contended instant costs one event its topology update, not a stalled input
   thread and a tap the OS disables for being slow.
 
+- **The layout is derived from the peer set, never stored beside it.** Two
+  sources of truth would eventually disagree, and the disagreement would surface
+  as a cursor stranded on a screen that is not there.
+
+- **Losing the active peer is a decision, not bookkeeping.** With one peer, a
+  disconnect is an inconvenience. With several, the machine *currently receiving
+  input* can vanish mid-sentence — the cursor is then on a screen that no longer
+  exists and every keystroke goes nowhere. `PeerSet::disconnect` returns
+  `ReclaimControl` for exactly that case, and the caller must act on it
+  immediately.
+
+- **Degradation does not reclaim control.** A peer that has missed a probe or two
+  is usually still there. Yanking the cursor back mid-sentence is worse for the
+  user than a moment of uncertainty.
+
 ## Testing
 
-`cargo test --workspace` — 413 tests, no hardware required beyond the host.
+`cargo test --workspace` — 430 tests, no hardware required beyond the host.
 
 Nine of those are property tests over the input state machine, asserting that
 after *any* sequence of events — including sequences no real keyboard produces —

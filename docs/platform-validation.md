@@ -224,6 +224,32 @@ Needing real hardware:
 | Crossing behaviour on a mixed-DPI arrangement | ⬜ | See ADR 0001 |
 | Handoff during an active drag | ⬜ | Button held across the boundary |
 
+## Milestone 8 — multiple computers
+
+Verified with three machines in one process, over two real QUIC connections:
+
+| Check | Status | Notes |
+|---|---|---|
+| A layout spans every connected machine | ✅ | Mac — Windows — Mac Mini, 5760 points wide |
+| Input reaches the selected machine and no other | ✅ | The far machine receives nothing meant for the middle one |
+| Switching between peers routes correctly | ✅ | |
+| **Losing the machine being typed into reclaims control** | ✅ | Over a real connection, with a modifier held |
+| The departed machine releases what it was holding | ✅ | Autonomously, on its own session-closed event |
+| A crossing towards a departed machine is refused | ✅ | The cursor stays put rather than vanishing |
+| Losing an idle machine does not move control | ✅ | |
+| A peer losing every screen reclaims control | ✅ | Display unplugged on the other machine |
+| A degraded peer keeps control | ✅ | One lost packet must not yank the cursor back |
+| Overlapping screens are reported, not accepted | ✅ | Two machines cannot own the same region |
+| The layout is stable across rebuilds | ✅ | A reshuffling device list is unusable |
+
+Needing real hardware:
+
+| Check | Status | Notes |
+|---|---|---|
+| Three physical machines in a chain | ⬜ | |
+| Crossing a chain end to end without stopping | ⬜ | Mac → Windows → Mac Mini in one motion |
+| Behaviour when the middle machine of a chain leaves | ⬜ | The far machine becomes unreachable by cursor |
+
 ## Known environment limitations
 
 The development host is an Intel iMac running macOS 15.7.9 on non-Apple hardware

@@ -6,10 +6,10 @@ the pointer past the edge of one screen and it continues on the next machine.
 Windows and macOS. An original implementation — no code, protocol or assets are
 taken from any existing software KVM.
 
-> **Status: milestone 7 of 14.** Input captured on one machine travels over an
-> authenticated connection to another, and the cursor crosses between them by
-> pushing past a screen edge. Verified end to end in headless tests, not yet on
-> two physical computers. See [Roadmap](#roadmap).
+> **Status: milestone 8 of 14.** One keyboard drives several computers, connected
+> in a chain, with the cursor crossing between them at screen edges. Verified end
+> to end in headless tests over real connections — not yet on physical machines.
+> See [Roadmap](#roadmap).
 
 ## Requirements
 
@@ -124,8 +124,8 @@ older schema would discard settings permanently.
 | 5 | QUIC transport, discovery, heartbeat, TLS | **done** |
 | 6 | Remote mouse and keyboard | **works end to end; needs two machines to sign off** |
 | 7 | Screen-edge switching | **done** |
-| 8 | Multiple computers | next |
-| 9 | Multiple monitors and DPI | |
+| 8 | Multiple computers | **done** |
+| 9 | Multiple monitors and DPI | next |
 | 10 | Pairing, verification codes, trust store | |
 | 11 | Clipboard synchronisation | |
 | 12 | File transfer | |
