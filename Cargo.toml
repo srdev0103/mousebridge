@@ -1,0 +1,79 @@
+[workspace]
+resolver = "3"
+members = [
+    "crates/mb-types",
+    "crates/mb-config",
+    "crates/mb-platform",
+    "crates/mb-core",
+    "crates/mb-input",
+    "apps/desktop/src-tauri",
+]
+
+[workspace.package]
+version = "0.1.0"
+edition = "2024"
+rust-version = "1.98"
+license = "MIT OR Apache-2.0"
+authors = ["MouseBridge contributors"]
+repository = "https://github.com/mousebridge/mousebridge"
+
+[workspace.dependencies]
+# --- internal ---
+mb-types = { path = "crates/mb-types" }
+mb-config = { path = "crates/mb-config" }
+mb-platform = { path = "crates/mb-platform" }
+mb-core = { path = "crates/mb-core" }
+mb-input = { path = "crates/mb-input" }
+
+# --- desktop runtime ---
+tauri = { version = "2.11", features = ["tray-icon"] }
+tauri-build = "2"
+serde_json = "1"
+
+# --- core ---
+serde = { version = "1.0.229", features = ["derive"] }
+toml = "1.1"
+thiserror = "2.0"
+tracing = "0.1"
+tracing-subscriber = { version = "0.3", features = ["env-filter", "fmt", "json"] }
+tracing-appender = "0.2"
+directories = "6.0"
+
+# --- macOS platform ---
+core-graphics = "0.25"
+core-foundation = "0.10"
+objc2 = "0.6"
+objc2-foundation = "0.3"
+
+# --- Windows platform ---
+windows = "0.62"
+
+# --- dev/test ---
+proptest = "1"
+insta = "1"
+
+[workspace.lints.rust]
+unsafe_code = "warn"
+missing_docs = "warn"
+unused_qualifications = "warn"
+
+[workspace.lints.clippy]
+all = { level = "warn", priority = -1 }
+todo = "warn"
+unimplemented = "warn"
+# The input path must not allocate or panic; these catch the common offenders.
+unwrap_used = "warn"
+expect_used = "warn"
+
+[profile.release]
+opt-level = 3
+lto = "thin"
+codegen-units = 1
+strip = true
+# NOTE: panic = "unwind" is deliberate. A panic on the input path must be caught
+# and trigger a release-all-keys recovery, not abort the process and strand the
+# user's modifiers in a held state.
+panic = "unwind"
+
+[profile.dev]
+opt-level = 1

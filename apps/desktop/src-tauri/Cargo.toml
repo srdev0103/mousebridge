@@ -1,0 +1,21 @@
+[package]
+name = "mousebridge-desktop"
+version.workspace = true
+edition.workspace = true
+rust-version.workspace = true
+license.workspace = true
+description = "MouseBridge desktop application shell."
+
+[build-dependencies]
+tauri-build = { workspace = true }
+
+[dependencies]
+mb-core = { workspace = true }
+mb-config = { workspace = true }
+mb-platform = { workspace = true }
+mb-types = { workspace = true }
+tauri = { workspace = true }
+tracing = { workspace = true }
+
+[lints]
+workspace = true

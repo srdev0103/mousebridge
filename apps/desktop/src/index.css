@@ -1,0 +1,39 @@
+@import "tailwindcss";
+
+/* The webview is transparent by default; without an explicit background the
+   host window colour bleeds through and the app looks broken in dark mode. */
+@theme {
+  --color-surface: #ffffff;
+  --color-surface-muted: #f8fafc;
+  --color-line: #e2e8f0;
+  --color-ink: #0f172a;
+  --color-ink-muted: #64748b;
+}
+
+@media (prefers-color-scheme: dark) {
+  @theme {
+    --color-surface: #0f172a;
+    --color-surface-muted: #1e293b;
+    --color-line: #334155;
+    --color-ink: #f1f5f9;
+    --color-ink-muted: #94a3b8;
+  }
+}
+
+html,
+body,
+#root {
+  height: 100%;
+}
+
+body {
+  margin: 0;
+  background: var(--color-surface);
+  color: var(--color-ink);
+  font-family: ui-sans-serif, -apple-system, "Segoe UI", system-ui, sans-serif;
+  -webkit-font-smoothing: antialiased;
+  /* A desktop chrome should not rubber-band or select like a web page. */
+  overscroll-behavior: none;
+  user-select: none;
+  cursor: default;
+}

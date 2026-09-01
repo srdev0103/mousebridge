@@ -1,0 +1,25 @@
+# Rust
+/target
+**/*.rs.bk
+
+# Node
+node_modules/
+dist/
+.vite/
+
+# Tauri
+apps/desktop/src-tauri/gen/
+apps/desktop/src-tauri/target/
+
+# macOS
+.DS_Store
+
+# Local secrets / signing
+*.p12
+*.mobileprovision
+.env
+.env.local
+
+# Editor
+.idea/
+*.swp

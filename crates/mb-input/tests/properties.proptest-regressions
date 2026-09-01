@@ -1,0 +1,9 @@
+# Seeds for failure cases proptest has generated in the past. It is
+# automatically read and these particular cases re-run before any
+# novel cases are generated.
+#
+# It is recommended to check this file in to source control so that
+# everyone who runs the test benefits from these saved cases.
+cc 89e9173f136e14d8963276e745f44e8d883a24b08d3d2bcbd7c990a8646037c9 # shrinks to events = [Enter { screen: ScreenId(0), position: (0.0, 0.0), held: HeldInput { keys: [], modifiers: Modifiers(0), buttons: MouseButtons(32) } }]
+cc aa051aefea9301f1596670e8a4c6a536f83ce936eda87fcb7e39c6f878ddc21f # shrinks to events = [Enter { screen: ScreenId(0), position: (0.0, 0.0), held: HeldInput { keys: [KeyCode { page: 7, usage: 6 }, KeyCode { page: 7, usage: 6 }], modifiers: Modifiers(0), buttons: MouseButtons(0) } }]
+cc 0208d4ff5a3d30937b0a6d98cee7bed25cec491e35149b8d72368ee4795e8c5f # shrinks to events = [Enter { screen: ScreenId(0), position: (0.0, 0.0), held: HeldInput { keys: [], modifiers: Modifiers(0), buttons: MouseButtons(32) } }]

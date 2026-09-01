@@ -1,0 +1,7 @@
+{
+  "$schema": "../gen/schemas/desktop-schema.json",
+  "identifier": "default",
+  "description": "Baseline capability for the dashboard window. Deliberately minimal: every additional permission widens what a compromised webview could reach, and the dashboard needs nothing beyond core IPC.",
+  "windows": ["main"],
+  "permissions": ["core:default"]
+}

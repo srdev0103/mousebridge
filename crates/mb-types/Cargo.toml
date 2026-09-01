@@ -1,0 +1,15 @@
+[package]
+name = "mb-types"
+version.workspace = true
+edition.workspace = true
+rust-version.workspace = true
+license.workspace = true
+description = "Shared primitive types for MouseBridge. No I/O, no async, no platform code."
+
+[dependencies]
+serde = { workspace = true }
+thiserror = { workspace = true }
+getrandom = "0.3"
+
+[lints]
+workspace = true
