@@ -19,6 +19,14 @@ thiserror = { workspace = true }
 core-graphics = { workspace = true }
 core-foundation = { workspace = true }
 
+[target.'cfg(target_os = "windows")'.dependencies]
+windows = { workspace = true, features = [
+    "Win32_Foundation",
+    "Win32_System_Threading",
+    "Win32_UI_Input_KeyboardAndMouse",
+    "Win32_UI_WindowsAndMessaging",
+] }
+
 [dev-dependencies]
 mb-platform = { workspace = true }
 

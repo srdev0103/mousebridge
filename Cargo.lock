@@ -1855,6 +1855,7 @@ dependencies = [
  "mb-platform",
  "mb-types",
  "thiserror 2.0.20",
+ "windows 0.62.2",
 ]
 
 [[package]]
@@ -4820,6 +4821,10 @@ dependencies = [
  "once_cell",
  "pkg-config",
 ]
+
+[[package]]
+name = "xtask"
+version = "0.1.0"
 
 [[package]]
 name = "yoke"

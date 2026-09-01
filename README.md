@@ -6,9 +6,9 @@ the pointer past the edge of one screen and it continues on the next machine.
 Windows and macOS. An original implementation — no code, protocol or assets are
 taken from any existing software KVM.
 
-> **Status: milestone 3 of 14.** Foundation, input model, and the macOS input
-> backend — a CoreGraphics event tap for capture and synthetic events for
-> injection. There is still no networking, so it cannot yet share input between
+> **Status: milestone 4 of 14.** Foundation, input model, and both OS input
+> backends — a CoreGraphics event tap on macOS, low-level hooks and `SendInput`
+> on Windows. There is still no networking, so it cannot yet share input between
 > computers. See [Roadmap](#roadmap).
 
 ## Requirements
@@ -26,7 +26,7 @@ taken from any existing software KVM.
 # Frontend dependencies
 cd apps/desktop && npm install && cd ../..
 
-# Run the whole workspace's tests
+# Run the whole workspace's tests, including the unsafe-code audit
 cargo test --workspace
 
 # Launch the app with hot reload
@@ -111,8 +111,8 @@ older schema would discard settings permanently.
 | 1 | Foundation: workspace, config, logging, platform abstraction, shell | **done** |
 | 2 | Input event abstraction + virtual backend | **done** |
 | 3 | macOS input capture and injection | **code complete, needs a permission grant to validate** |
-| 4 | Windows input capture and injection | next |
-| 5 | QUIC transport, discovery, heartbeat, TLS | |
+| 4 | Windows input capture and injection | **code complete, needs a Windows machine to validate** |
+| 5 | QUIC transport, discovery, heartbeat, TLS | next |
 | 6 | Remote mouse and keyboard | |
 | 7 | Screen-edge switching | |
 | 8 | Multiple computers | |

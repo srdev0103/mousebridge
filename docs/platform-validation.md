@@ -102,13 +102,31 @@ its own identity; that needs the bundled application.
 
 ### Windows
 
+All Windows code is **compile-checked only** — `cargo check --target
+x86_64-pc-windows-msvc` and `aarch64-pc-windows-msvc` are clean, and
+`clippy -D warnings` passes for both. That proves signatures and types. It proves
+nothing below.
+
+The pure logic *is* tested, on any host: the scan-code table, wheel conversion,
+absolute-coordinate normalisation and the shell-shortcut state machine account
+for 20 of the passing tests and run in CI on macOS.
+
 | Check | Status | Notes |
 |---|---|---|
-| `WH_*_LL` hooks re-install after `LowLevelHooksTimeout` | ⬜ | |
+| Hooks install and deliver on a dedicated message-pump thread | ⬜ | |
+| Hook procedure stays inside `LowLevelHooksTimeout` under load | ⬜ | 300 ms default; exceeding it silently skips the hook |
+| Recovery after a timeout skip works via stop-then-start | ⬜ | Unlike a macOS tap, a Windows hook cannot be re-enabled in place |
+| Suppression stops the local cursor while control is remote | ⬜ | |
+| **Delta accumulation survives cursor anchoring** | ⬜ | Suppressed moves leave the cursor still, so deltas come from diffing the reported destination. Pinned at a screen edge the destination is clamped and movement is lost — hence parking at the primary display centre. This is the riskiest untested assumption in the backend |
 | Absolute injection avoids double pointer acceleration | ⬜ | Core reason for `MouseMoveTo`; see ADR 0001 |
-| **Lone `Meta` release does not open the Start menu** | ⬜ | A release sequence ending in a solitary `Meta` up triggers Start. The injector must neutralise it, conventionally by bracketing with an inert key. Same problem for a lone `Alt` and the menu bar. |
-| `WHEEL_DELTA` notches convert to lines using the user's setting | ⬜ | `SPI_GETWHEELSCROLLLINES` |
-| Injection into an elevated window fails cleanly and visibly | ⬜ | Expected to fail; must not fail *silently* |
+| **Lone `Meta` release does not open the Start menu** | ⬜ | Guard implemented and unit tested (`ShellShortcutGuard`); whether `VK_NONAME` actually suppresses the shell action needs real Windows |
+| Same for a lone `Alt` and the menu bar | ⬜ | |
+| `WM_SYSKEYDOWN` captures Alt combinations | ⬜ | Handled; without it every Alt chord is invisible |
+| Injected events are ignored by our own hook | ⬜ | Via `dwExtraInfo` marker plus the `LLHF_INJECTED` flag |
+| `WHEEL_DELTA` notches use the user's `SPI_GETWHEELSCROLLLINES` | ⬜ | Conversion tested; the value is not yet read from the OS |
+| AltGr on a European layout produces accented characters | ⬜ | Mapped as extended Right Alt |
+| Injection into an elevated window fails cleanly and visibly | ⬜ | Expected to fail (UIPI). `SendInput` returns a short count, which is reported specifically — it must not fail *silently* |
+| Media keys report through the PS/2 set, not a vendor collection | ⬜ | Table entries are a best guess; some keyboards differ |
 
 ## Known environment limitations
 

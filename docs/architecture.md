@@ -66,7 +66,8 @@ Dependencies point one way. `mb-types` depends on nothing; `mb-config` and
 | `mb-types` | ids, names, geometry, `Redacted` | no | none (`forbid(unsafe_code)`) |
 | `mb-config` | schema, atomic store, migration | no | none |
 | `mb-platform` | displays, permissions, host identity | no | isolated in `macos/`, `windows/` |
-| `mb-input` | events, key codes, held-state tracking, backend traits | no | none yet (backends land in M3/M4) |
+| `mb-input` | events, key codes, held-state tracking, backend traits | no | none (`forbid(unsafe_code)`) |
+| `mb-input-native` | OS capture and injection backends | no | isolated in `macos/`, `windows/` |
 | `mb-core` | orchestration, logging, status snapshot | no (yet) | none |
 | `mousebridge-desktop` | window, tray, IPC commands | — | thin shims only |
 
@@ -81,10 +82,12 @@ Dependencies point one way. `mb-types` depends on nothing; `mb-config` and
   `<redacted N bytes>` from both `Debug` and `Display`, so logging a struct that
   contains one cannot leak it. Audit with `grep -r '\.expose()'`.
 
-- **`unsafe` is confined and justified.** All macOS `unsafe` is in
-  `mb-platform/src/macos/ffi.rs`; all Windows `unsafe` is in
-  `mb-platform/src/windows/mod.rs`. Every block carries a `SAFETY` comment
-  discharging its contract. Everywhere else, `unsafe_code` is a workspace lint.
+- **`unsafe` is confined, and the justification is enforced.** It appears in five
+  files, all of them OS bindings; everywhere else `unsafe_code` is a workspace
+  lint, and `mb-types`, `mb-config`, `mb-core`, `mb-input` and `xtask` forbid it
+  outright. Every block carries a `SAFETY` comment discharging its contract, and
+  `xtask::unsafe_audit` fails `cargo test --workspace` if one does not — so the
+  rule cannot decay between reviews. Currently 34 blocks, 34 justifications.
 
 - **Config recovery is asymmetric on purpose.** A *corrupt* file is preserved and
   replaced with defaults, because refusing to launch is worse for a background
@@ -106,9 +109,21 @@ Dependencies point one way. `mb-types` depends on nothing; `mb-config` and
   than a default trait method because a default method can be overridden, and a
   NaN passed to `SendInput` is undefined behaviour in the focused application.
 
+- **Platform backends live in their own crate.** `mb-input-native` is separate
+  from `mb-input` so the event model stays `forbid(unsafe_code)`, and so
+  `core-graphics` and the `windows` crate stay out of the dependency graph for
+  the protocol, topology and core crates that only need the model.
+
+- **Every platform's pure logic compiles on every host.** Only the modules that
+  call the OS are `#[cfg]`-gated; the key tables and field conversions for both
+  platforms build and test anywhere. This is what makes the cross-table test
+  possible — the two key tables are hand-written from different sources, and each
+  round-trips perfectly on its own while potentially disagreeing with the other.
+  Gating by host would hide exactly that.
+
 ## Testing
 
-`cargo test --workspace` — 149 tests, no hardware required beyond the host.
+`cargo test --workspace` — 201 tests, no hardware required beyond the host.
 
 Nine of those are property tests over the input state machine, asserting that
 after *any* sequence of events — including sequences no real keyboard produces —

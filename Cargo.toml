@@ -8,6 +8,7 @@ members = [
     "crates/mb-input",
     "crates/mb-input-native",
     "apps/desktop/src-tauri",
+    "xtask",
 ]
 
 [workspace.package]
