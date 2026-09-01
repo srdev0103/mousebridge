@@ -8,7 +8,7 @@
 use crate::error::NetError;
 use crate::tls;
 use mb_protocol::frame::{FrameDecode, decode_frame};
-use mb_protocol::message::{self, ControlMessage, Hello};
+use mb_protocol::message::{self, ControlMessage, Hello, SessionMessage};
 use mb_protocol::version::{Version, VersionRange};
 use mb_security::Identity;
 use mb_security::pinning::SharedTrust;
@@ -45,9 +45,16 @@ const IDLE_TIMEOUT: Duration = Duration::from_secs(5);
 const SERVER_NAME: &str = "mousebridge.local";
 
 /// A connected, authenticated peer.
+///
+/// Carries the control stream opened during the handshake. Keeping it rather
+/// than reopening one later matters: a second stream would need its own
+/// authentication story, and there would be a window in which the peer is
+/// connected but not yet reachable.
 #[derive(Debug)]
 pub struct PeerConnection {
     connection: quinn::Connection,
+    send: quinn::SendStream,
+    recv: quinn::RecvStream,
     device: DeviceId,
     name: DeviceName,
     version: Version,
@@ -85,6 +92,12 @@ impl PeerConnection {
     #[must_use]
     pub const fn quic(&self) -> &quinn::Connection {
         &self.connection
+    }
+
+    /// Splits the connection into its parts, for the session layer.
+    #[must_use]
+    pub fn into_parts(self) -> (quinn::Connection, quinn::SendStream, quinn::RecvStream) {
+        (self.connection, self.send, self.recv)
     }
 
     /// Closes the connection.
@@ -223,7 +236,11 @@ impl Endpoint {
 
         let hello = self.hello();
         let mut buffer = Vec::new();
-        message::encode(&ControlMessage::Hello(hello), "hello", &mut buffer)?;
+        message::encode(
+            &SessionMessage::Control(ControlMessage::Hello(hello)),
+            "hello",
+            &mut buffer,
+        )?;
         send.write_all(&buffer)
             .await
             .map_err(|e| NetError::Stream {
@@ -249,7 +266,7 @@ impl Endpoint {
             }));
         };
 
-        let peer = self.finish(connection, device, name, version)?;
+        let peer = self.finish(connection, send, recv, device, name, version)?;
         info!(peer = %peer.device(), name = %peer.name(), %version, "connected to peer");
         Ok(peer)
     }
@@ -305,11 +322,11 @@ impl Endpoint {
 
         let mut buffer = Vec::new();
         message::encode(
-            &ControlMessage::HelloAck {
+            &SessionMessage::Control(ControlMessage::HelloAck {
                 version,
                 device: self.identity.device_id(),
                 name: self.local_name.clone(),
-            },
+            }),
             "hello_ack",
             &mut buffer,
         )?;
@@ -320,15 +337,21 @@ impl Endpoint {
                 detail: e.to_string(),
             })?;
 
-        let peer = self.finish(connection, hello.device, hello.name, version)?;
+        let peer = self.finish(connection, send, recv, hello.device, hello.name, version)?;
         info!(peer = %peer.device(), name = %peer.name(), %version, "accepted peer");
         Ok(peer)
     }
 
     /// Builds the connection record, checking the peer's claimed identity.
+    #[allow(
+        clippy::too_many_arguments,
+        reason = "these are the parts of one handshake result, not independent knobs"
+    )]
     fn finish(
         &self,
         connection: quinn::Connection,
+        send: quinn::SendStream,
+        recv: quinn::RecvStream,
         claimed: DeviceId,
         name: DeviceName,
         version: Version,
@@ -349,6 +372,8 @@ impl Endpoint {
 
         Ok(PeerConnection {
             connection,
+            send,
+            recv,
             device: verified,
             name,
             version,
@@ -411,9 +436,15 @@ async fn read_message(recv: &mut quinn::RecvStream) -> Result<ControlMessage, Ne
     loop {
         match decode_frame(&buffer)? {
             FrameDecode::Complete { payload, .. } => {
-                let decoded: ControlMessage = message::decode(payload, "control")?;
+                let decoded: SessionMessage = message::decode(payload, "control")?;
                 decoded.validate()?;
-                return Ok(decoded);
+                let SessionMessage::Control(control) = decoded else {
+                    return Err(NetError::Protocol(mb_protocol::ProtocolError::Invalid {
+                        field: "handshake",
+                        reason: "expected a control message",
+                    }));
+                };
+                return Ok(control);
             }
             FrameDecode::Incomplete { .. } => {}
         }

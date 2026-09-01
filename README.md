@@ -6,10 +6,11 @@ the pointer past the edge of one screen and it continues on the next machine.
 Windows and macOS. An original implementation — no code, protocol or assets are
 taken from any existing software KVM.
 
-> **Status: milestone 5 of 14.** Foundation, input model, both OS input backends,
-> and an authenticated QUIC transport with peer discovery. The two halves are not
-> yet wired together — captured input does not travel over the network — so it
-> cannot share input between computers. See [Roadmap](#roadmap).
+> **Status: milestone 6 of 14.** Input captured on one machine now travels over an
+> authenticated connection and is injected on another — verified end to end in a
+> headless test, not yet on two physical computers. Switching between machines is
+> still manual; the screen-edge crossing that makes it feel seamless is milestone
+> 7. See [Roadmap](#roadmap).
 
 ## Requirements
 
@@ -121,8 +122,8 @@ older schema would discard settings permanently.
 | 3 | macOS input capture and injection | **code complete, needs a permission grant to validate** |
 | 4 | Windows input capture and injection | **code complete, needs a Windows machine to validate** |
 | 5 | QUIC transport, discovery, heartbeat, TLS | **done** |
-| 6 | Remote mouse and keyboard | next |
-| 7 | Screen-edge switching | |
+| 6 | Remote mouse and keyboard | **works end to end; needs two machines to sign off** |
+| 7 | Screen-edge switching | next |
 | 8 | Multiple computers | |
 | 9 | Multiple monitors and DPI | |
 | 10 | Pairing, verification codes, trust store | |

@@ -10,6 +10,10 @@ description = "MouseBridge orchestration: application state, logging, status rep
 mb-types = { workspace = true }
 mb-config = { workspace = true }
 mb-platform = { workspace = true }
+mb-input = { workspace = true }
+mb-protocol = { workspace = true }
+mb-net = { workspace = true }
+tokio = { version = "1", features = ["rt", "sync", "time", "macros"] }
 serde = { workspace = true }
 thiserror = { workspace = true }
 tracing = { workspace = true }
@@ -19,6 +23,8 @@ tracing-appender = { workspace = true }
 [dev-dependencies]
 tempfile = "3"
 serde_json = "1"
+tokio = { version = "1", features = ["rt-multi-thread", "macros", "time", "sync"] }
+mb-security = { workspace = true }
 
 [lints]
 workspace = true

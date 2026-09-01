@@ -2014,12 +2014,17 @@ name = "mb-core"
 version = "0.1.0"
 dependencies = [
  "mb-config",
+ "mb-input",
+ "mb-net",
  "mb-platform",
+ "mb-protocol",
+ "mb-security",
  "mb-types",
  "serde",
  "serde_json",
  "tempfile",
  "thiserror 2.0.20",
+ "tokio",
  "tracing",
  "tracing-appender",
  "tracing-subscriber",

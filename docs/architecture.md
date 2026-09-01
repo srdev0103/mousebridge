@@ -140,9 +140,21 @@ Dependencies point one way. `mb-types` depends on nothing; `mb-config` and
   pinned certificate in the TLS handshake. The connect address is taken from the
   packet, never from the payload, so a peer cannot redirect connections.
 
+- **The capture thread only ever enqueues.** `Router::on_event` reads an atomic,
+  pushes into a bounded queue, and returns. Motion is dropped when that queue is
+  full, because the next position supersedes it; a key or button transition is
+  never dropped — losing one desynchronises the two machines, so the session is
+  torn down instead and both sides release.
+
+- **A forwarding task must not hold its own queue's sender.** `forward` takes a
+  `RouterMonitor`, not a `Router`, because the latter owns the sending half of
+  the input queue — a task holding one would keep its own input channel alive
+  and never notice the capture side going away. The connection would outlive the
+  thing feeding it. Found by an end-to-end test that hung for twenty seconds.
+
 ## Testing
 
-`cargo test --workspace` — 344 tests, no hardware required beyond the host.
+`cargo test --workspace` — 369 tests, no hardware required beyond the host.
 
 Nine of those are property tests over the input state machine, asserting that
 after *any* sequence of events — including sequences no real keyboard produces —

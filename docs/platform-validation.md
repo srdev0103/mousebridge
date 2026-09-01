@@ -168,6 +168,34 @@ Still unverified, and needing a second machine:
 | Heartbeat detects a genuinely wedged peer | ⬜ | State machine is unit tested; the wiring is not |
 | Latency under load, p50/p99 | ⬜ | Needs two physical machines; milestone 6 |
 
+## Milestone 6 — remote input
+
+The full pipeline is verified **headlessly**, in one process: a virtual capture
+backend feeds the router, which forwards over a real authenticated QUIC
+connection to a virtual injector. Only the two ends that touch hardware are
+simulated, and both are real state machines rather than stubs.
+
+| Check | Status | Notes |
+|---|---|---|
+| A keystroke captured here lands on the other machine | ✅ | Through the real transport |
+| Local input never leaves the machine | ✅ | Nothing forwarded until the destination changes |
+| Pointer motion moves the remote cursor | ✅ | Accumulated position over datagrams |
+| A chord arrives intact and in order | ✅ | Cmd+C down/up leaves the remote clean |
+| **The remote releases when the sender vanishes** | ✅ | No goodbye, no clean close; remote still lets go |
+| Input arrives in order over the reliable stream | ✅ | A key-up cannot overtake its key-down |
+| A clean shutdown carries its reason | ✅ | Distinguishes "user quit" from "cable pulled" |
+| An idle session stays open | ✅ | Heartbeats hold it for at least 6 s |
+
+Not verified, and needing real machines:
+
+| Check | Status | Notes |
+|---|---|---|
+| macOS → macOS with real capture and injection | ⬜ | Needs the permission grant plus a second Mac |
+| Windows → Windows | ⬜ | Needs two Windows machines |
+| **Windows ↔ macOS** | ⬜ | The case both key tables exist for |
+| Input latency, p50/p99 | ⬜ | No figure has been measured. A VM cannot produce a trustworthy one |
+| Behaviour on real Wi-Fi under contention | ⬜ | Loopback has no loss and no jitter |
+
 ## Known environment limitations
 
 The development host is an Intel iMac running macOS 15.7.9 on non-Apple hardware

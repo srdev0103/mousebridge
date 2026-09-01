@@ -148,6 +148,43 @@ pub enum InputMessage {
     ReleaseAll,
 }
 
+/// Anything carried on the reliable session stream.
+///
+/// # Why one stream, not two
+///
+/// The original design put control and input on separate QUIC streams. That was
+/// wrong: both are tiny and low-rate, so neither can head-of-line block the
+/// other in any measurable way, and two streams meant twice the lifecycle to get
+/// right. The head-of-line concern that motivated separate streams was **file
+/// transfer**, which is genuinely large and does still get its own stream.
+///
+/// Pointer motion stays off this stream entirely — it travels as unreliable
+/// datagrams, where a dropped packet costs one frame instead of blocking
+/// everything behind it.
+///
+/// As with the enums above, variant order is part of the wire format.
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
+pub enum SessionMessage {
+    /// Handshake, heartbeat, cursor handoff, disconnection.
+    Control(ControlMessage),
+    /// Button, key and wheel events.
+    Input(InputMessage),
+}
+
+impl SessionMessage {
+    /// Checks a decoded message for impossible values.
+    ///
+    /// # Errors
+    ///
+    /// [`ProtocolError::Invalid`] naming the offending field.
+    pub fn validate(&self) -> Result<(), ProtocolError> {
+        match self {
+            Self::Control(m) => m.validate(),
+            Self::Input(m) => m.validate(),
+        }
+    }
+}
+
 /// Encodes a message into a length-prefixed frame appended to `out`.
 ///
 /// # Errors
@@ -437,6 +474,40 @@ mod tests {
     }
 
     #[test]
+    fn session_messages_round_trip() {
+        let messages = vec![
+            SessionMessage::Control(ControlMessage::CursorLeave),
+            SessionMessage::Input(InputMessage::ReleaseAll),
+            SessionMessage::Control(ControlMessage::Hello(hello())),
+            SessionMessage::Input(InputMessage::Key {
+                key: keys::A,
+                pressed: true,
+                repeat: false,
+            }),
+        ];
+        for message in messages {
+            assert_eq!(round_trip(&message, "session"), message);
+        }
+    }
+
+    #[test]
+    fn the_session_wrapper_validates_what_it_carries() {
+        // The wrapper must not become a way to smuggle an invalid payload past
+        // the checks that apply to it directly.
+        let bad = SessionMessage::Input(InputMessage::Wheel {
+            delta: ScrollDelta::precise(f32::NAN, 0.0),
+        });
+        assert!(bad.validate().is_err());
+
+        let also_bad = SessionMessage::Control(ControlMessage::CursorEnter {
+            screen: ScreenId(0),
+            position: (5.0, 0.0),
+            held: HeldInput::default(),
+        });
+        assert!(also_bad.validate().is_err());
+    }
+
+    #[test]
     fn wire_layout_is_stable() {
         // Postcard encodes an externally tagged enum as a varint variant index,
         // so inserting or reordering a variant silently changes the wire format.
@@ -469,6 +540,17 @@ mod tests {
         assert_eq!(
             postcard::to_stdvec(&InputMessage::ReleaseAll).expect("encodes"),
             vec![0x03],
+        );
+
+        // The session wrapper prefixes its own variant index.
+        assert_eq!(
+            postcard::to_stdvec(&SessionMessage::Input(InputMessage::ReleaseAll)).expect("encodes"),
+            vec![0x01, 0x03],
+        );
+        assert_eq!(
+            postcard::to_stdvec(&SessionMessage::Control(ControlMessage::CursorLeave))
+                .expect("encodes"),
+            vec![0x00, 0x05],
         );
     }
 

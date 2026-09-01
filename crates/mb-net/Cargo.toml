@@ -20,6 +20,7 @@ bytes = "1"
 [dev-dependencies]
 tokio = { version = "1", features = ["rt-multi-thread", "macros", "time"] }
 mb-input = { workspace = true }
+mb-protocol = { workspace = true }
 
 [lints]
 workspace = true

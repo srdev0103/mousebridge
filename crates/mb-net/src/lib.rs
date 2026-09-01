@@ -26,9 +26,11 @@
 pub mod endpoint;
 pub mod error;
 pub mod heartbeat;
+pub mod session;
 pub mod tls;
 
 pub use endpoint::{Endpoint, PeerConnection};
 pub use error::NetError;
 pub use heartbeat::{HeartbeatMonitor, Liveness};
+pub use session::{ClosedReason, Session, SessionEvent, SessionHandle};
 pub use tls::ALPN;
