@@ -6,11 +6,10 @@ the pointer past the edge of one screen and it continues on the next machine.
 Windows and macOS. An original implementation — no code, protocol or assets are
 taken from any existing software KVM.
 
-> **Status: milestone 2 of 14.** The foundation and the input model are in place:
-> configuration, logging, platform abstraction, the application shell, and a
-> platform-independent input event model with a headless simulation backend.
-> There is no networking and no OS-level input capture yet, so it cannot share
-> input between computers. See [Roadmap](#roadmap).
+> **Status: milestone 3 of 14.** Foundation, input model, and the macOS input
+> backend — a CoreGraphics event tap for capture and synthetic events for
+> injection. There is still no networking, so it cannot yet share input between
+> computers. See [Roadmap](#roadmap).
 
 ## Requirements
 
@@ -48,6 +47,16 @@ Inspect what the platform layer sees on this machine:
 cargo run -p mb-platform --example probe
 ```
 
+Exercise the macOS input backend, including an injection self-test:
+
+```sh
+cargo run -p mb-input-native --example input-check -- --seconds 10
+```
+
+A command-line binary inherits the privacy grants of whatever launched it, so
+this needs **Terminal** to hold Accessibility and Input Monitoring. It reports
+event counts and kinds only — never which keys were pressed.
+
 ## macOS development note
 
 macOS ties Accessibility and Input Monitoring grants to an application's **code
@@ -75,6 +84,7 @@ crates/
   mb-platform/         displays, permissions, host identity
   mb-core/             orchestration, logging, status snapshot
   mb-input/            input events, state tracking, capture/inject traits
+  mb-input-native/     OS input backends (CoreGraphics event tap, injection)
 docs/
   adr/                 architecture decision records
   platform-validation.md   what has actually been tested, and where
@@ -100,8 +110,8 @@ older schema would discard settings permanently.
 |---|---|---|
 | 1 | Foundation: workspace, config, logging, platform abstraction, shell | **done** |
 | 2 | Input event abstraction + virtual backend | **done** |
-| 3 | macOS input capture and injection | next |
-| 4 | Windows input capture and injection | |
+| 3 | macOS input capture and injection | **code complete, needs a permission grant to validate** |
+| 4 | Windows input capture and injection | next |
 | 5 | QUIC transport, discovery, heartbeat, TLS | |
 | 6 | Remote mouse and keyboard | |
 | 7 | Screen-edge switching | |

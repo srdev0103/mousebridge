@@ -16,9 +16,18 @@ use std::fmt;
 /// carries one unit, and the receiver applies its own preferences.
 #[derive(Debug, Clone, Copy, PartialEq, Serialize, Deserialize)]
 pub struct ScrollDelta {
-    /// Horizontal lines. Positive scrolls content right.
+    /// Horizontal lines. Positive is the direction the OS itself reports as
+    /// positive, which on both platforms is "to the right" from the user.
     pub x: f32,
-    /// Vertical lines. Positive scrolls content down.
+    /// Vertical lines. Positive is away from the user — the traditional "scroll
+    /// up" direction. macOS `deltaAxis1` and the Windows `WHEEL_DELTA` sign
+    /// already agree on this, so the value passes through unchanged.
+    ///
+    /// macOS applies its "natural scrolling" preference *before* the event
+    /// reaches us, so a user with it enabled sends an already-inverted delta to a
+    /// Windows machine that has no such preference. Whether that feels right is a
+    /// question only real hardware can answer; it is listed for validation, and a
+    /// per-peer inversion setting is the fallback if it does not.
     pub y: f32,
     /// True when the source device reported a continuous, pixel-precise delta —
     /// a trackpad or a free-spinning wheel — rather than discrete notches.

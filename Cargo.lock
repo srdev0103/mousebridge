@@ -1846,6 +1846,18 @@ dependencies = [
 ]
 
 [[package]]
+name = "mb-input-native"
+version = "0.1.0"
+dependencies = [
+ "core-foundation",
+ "core-graphics",
+ "mb-input",
+ "mb-platform",
+ "mb-types",
+ "thiserror 2.0.20",
+]
+
+[[package]]
 name = "mb-platform"
 version = "0.1.0"
 dependencies = [

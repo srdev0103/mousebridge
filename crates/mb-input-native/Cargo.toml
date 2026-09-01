@@ -1,0 +1,26 @@
+[package]
+name = "mb-input-native"
+version.workspace = true
+edition.workspace = true
+rust-version.workspace = true
+license.workspace = true
+description = "Operating-system input capture and injection backends for MouseBridge."
+
+# Split from `mb-input` deliberately. The event model and state machine are
+# depended on by the protocol, topology and core crates, none of which should
+# pull in CoreGraphics or the Windows API. Keeping the backends here also lets
+# `mb-input` keep `#![forbid(unsafe_code)]`, which a crate containing FFI cannot.
+[dependencies]
+mb-input = { workspace = true }
+mb-types = { workspace = true }
+thiserror = { workspace = true }
+
+[target.'cfg(target_os = "macos")'.dependencies]
+core-graphics = { workspace = true }
+core-foundation = { workspace = true }
+
+[dev-dependencies]
+mb-platform = { workspace = true }
+
+[lints]
+workspace = true

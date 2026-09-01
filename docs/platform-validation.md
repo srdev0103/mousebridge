@@ -80,13 +80,25 @@ one as a platform obligation, and the list should exist before the code does.
 
 ### macOS
 
+Run `cargo run -p mb-input-native --example input-check -- --seconds 10`.
+
+Note that a command-line binary inherits the TCC grants of whatever launched it,
+so the harness needs **Terminal** to hold Accessibility and Input Monitoring. It
+therefore does not validate the permission path a signed `.app` takes, which has
+its own identity; that needs the bundled application.
+
 | Check | Status | Notes |
 |---|---|---|
-| Event tap re-arms after `kCGEventTapDisabledByTimeout` | ⬜ | Silent failure if missed |
+| Tap creation reports the missing permission specifically | ✅ | Returned "create event tap requires the Accessibility permission", not a generic failure |
+| **Injection fails silently without Accessibility** | ✅ | `CGEventPost` returns void, `CGEventSourceCreate` still succeeds, cursor does not move, **no error reported**. Callers must gate on the permission check; tests must assert the observable effect |
+| Event tap re-arms after `kCGEventTapDisabledByTimeout` | ⬜ | Needs a grant; silent failure if missed |
+| Capture observes moves, buttons, wheel, keys, modifiers | ⬜ | Needs a grant |
+| Injected events are ignored by our own tap | ⬜ | Needs a grant. Without the marker check this is an infinite echo |
+| Suppression stops the local cursor while control is remote | ⬜ | Needs a grant |
+| Modifier `flagsChanged` maps to key down/up correctly | ⬜ | macOS has no keyUp for modifiers; diffing logic is unit tested |
 | Secure Input detection identifies the blocking process | ⬜ | `kCGSSessionSecureInputPID`; API needs confirming on 15 |
-| Modifier `flagsChanged` maps to key down/up correctly | ⬜ | macOS has no keyUp for modifiers |
-| Suppression stops the local cursor while control is remote | ⬜ | |
-| Pixel-precise trackpad scroll converts to lines sensibly | ⬜ | |
+| Pixel-precise trackpad scroll converts to lines sensibly | ⬜ | Conversion is unit tested; feel is not |
+| Drag across the boundary continues (uses `*MouseDragged`) | ⬜ | Posting `MouseMoved` mid-drag would break it |
 
 ### Windows
 

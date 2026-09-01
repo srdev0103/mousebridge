@@ -6,6 +6,7 @@ members = [
     "crates/mb-platform",
     "crates/mb-core",
     "crates/mb-input",
+    "crates/mb-input-native",
     "apps/desktop/src-tauri",
 ]
 
@@ -24,6 +25,7 @@ mb-config = { path = "crates/mb-config" }
 mb-platform = { path = "crates/mb-platform" }
 mb-core = { path = "crates/mb-core" }
 mb-input = { path = "crates/mb-input" }
+mb-input-native = { path = "crates/mb-input-native" }
 
 # --- desktop runtime ---
 tauri = { version = "2.11", features = ["tray-icon"] }
@@ -40,7 +42,7 @@ tracing-appender = "0.2"
 directories = "6.0"
 
 # --- macOS platform ---
-core-graphics = "0.25"
+core-graphics = { version = "0.25", features = ["highsierra"] }
 core-foundation = "0.10"
 objc2 = "0.6"
 objc2-foundation = "0.3"
